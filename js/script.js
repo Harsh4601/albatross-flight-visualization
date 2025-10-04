@@ -1955,9 +1955,13 @@ function addTimeSelectionToChart(chart, chartType) {
         if (!selectionOverlay || selectionStart === null || selectionEnd === null) return;
         
         const canvasRect = canvas.getBoundingClientRect();
+        const parentRect = canvas.parentElement.getBoundingClientRect();
         const chartArea = chart.chartArea;
         const xScale = chart.scales.x;
-        const yScale = chart.scales.y;
+        
+        // Get canvas offset relative to parent
+        const canvasOffsetTop = canvasRect.top - parentRect.top;
+        const canvasOffsetLeft = canvasRect.left - parentRect.left;
         
         // Get the time values for start and end indices
         const startTime = chart.data.labels[selectionStart];
@@ -1971,17 +1975,11 @@ function addTimeSelectionToChart(chart, chartType) {
         const right = Math.max(startPixel, endPixel);
         const width = right - left;
         
-        // Use y-axis scale bounds to get exact plot area
-        const yMin = yScale.max;
-        const yMax = yScale.min;
-        const topPixel = yScale.getPixelForValue(yMin);
-        const bottomPixel = yScale.getPixelForValue(yMax);
-        
-        // Position overlay using y-axis scale coordinates
-        selectionOverlay.style.left = `${left}px`;
-        selectionOverlay.style.top = `${topPixel}px`;
+        // Use chartArea bounds with canvas offset
+        selectionOverlay.style.left = `${canvasOffsetLeft + left}px`;
+        selectionOverlay.style.top = `${canvasOffsetTop + chartArea.top}px`;
         selectionOverlay.style.width = `${width}px`;
-        selectionOverlay.style.height = `${bottomPixel - topPixel}px`;
+        selectionOverlay.style.height = `${chartArea.bottom - chartArea.top}px`;
     }
 
     // Mouse down event
@@ -2143,22 +2141,21 @@ function addSynchronizedHoverLine(chart, chartType) {
         if (!chartArea) return;
 
         const xScale = chart.scales.x;
-        const yScale = chart.scales.y;
         const pixelX = xScale.getPixelForValue(timeValue);
         
         if (pixelX >= chartArea.left && pixelX <= chartArea.right) {
             const line = createHoverLine();
             
-            // Use y-axis scale bounds to get exact plot area
-            const yMin = yScale.max;
-            const yMax = yScale.min;
-            const topPixel = yScale.getPixelForValue(yMin);
-            const bottomPixel = yScale.getPixelForValue(yMax);
+            // Get canvas position relative to parent
+            const canvasRect = canvas.getBoundingClientRect();
+            const parentRect = canvas.parentElement.getBoundingClientRect();
+            const canvasOffsetTop = canvasRect.top - parentRect.top;
+            const canvasOffsetLeft = canvasRect.left - parentRect.left;
             
-            // Position using y-axis scale coordinates
-            line.style.left = `${pixelX}px`;
-            line.style.top = `${topPixel}px`;
-            line.style.height = `${bottomPixel - topPixel}px`;
+            // Use chartArea bounds with canvas offset
+            line.style.left = `${canvasOffsetLeft + pixelX}px`;
+            line.style.top = `${canvasOffsetTop + chartArea.top}px`;
+            line.style.height = `${chartArea.bottom - chartArea.top}px`;
             line.style.display = 'block';
         }
     }
@@ -2223,20 +2220,20 @@ function addSynchronizedHoverLine(chart, chartType) {
         if (!chartArea || !targetHoverLine) return;
 
         const xScale = targetChart.scales.x;
-        const yScale = targetChart.scales.y;
         const pixelX = xScale.getPixelForValue(timeValue);
         
         if (pixelX >= chartArea.left && pixelX <= chartArea.right) {
-            // Use y-axis scale bounds to get exact plot area
-            const yMin = yScale.max;
-            const yMax = yScale.min;
-            const topPixel = yScale.getPixelForValue(yMin);
-            const bottomPixel = yScale.getPixelForValue(yMax);
+            // Get canvas position relative to parent
+            const targetCanvas = targetChart.canvas;
+            const canvasRect = targetCanvas.getBoundingClientRect();
+            const parentRect = targetCanvas.parentElement.getBoundingClientRect();
+            const canvasOffsetTop = canvasRect.top - parentRect.top;
+            const canvasOffsetLeft = canvasRect.left - parentRect.left;
             
-            // Position using y-axis scale coordinates
-            targetHoverLine.style.left = `${pixelX}px`;
-            targetHoverLine.style.top = `${topPixel}px`;
-            targetHoverLine.style.height = `${bottomPixel - topPixel}px`;
+            // Use chartArea bounds with canvas offset
+            targetHoverLine.style.left = `${canvasOffsetLeft + pixelX}px`;
+            targetHoverLine.style.top = `${canvasOffsetTop + chartArea.top}px`;
+            targetHoverLine.style.height = `${chartArea.bottom - chartArea.top}px`;
             targetHoverLine.style.display = 'block';
         }
     }
