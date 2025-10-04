@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Albatross Flight Path Visualization</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Welcome Screen -->
+    <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-content">
+            <h1>🦅 Albatross Flight Visualization</h1>
+            <p>Upload your CSV file containing flight sensor data to visualize the albatross flight path in stunning 3D, along with detailed sensor metrics and geographic mapping.</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <div class="file-input-wrapper">
+                    <button class="upload-btn">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        Choose CSV File
+                    </button>
+                    <input type="file" id="csvFileInput" accept=".csv">
+                </div>
+                <div class="file-info" id="fileInfo">No file selected</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Processing Overlay -->
+    <div class="processing-overlay" id="processingOverlay">
+        <div class="processing-content">
+            <div class="spinner"></div>
+            <p>Processing your data...</p>
+            <p class="progress-text" id="progressText">Reading CSV file...</p>
+        </div>
+    </div>
+
+    <div class="main-container hidden" id="mainContainer">
+        <!-- 3D Visualization Section (25%) -->
+        <div class="section-3d">
+            <button class="maximize-btn" data-section="3d" title="Maximize 3D Visualization">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+            </button>
+            <div id="container"></div>
+            <div id="info">Albatross Flight Path Visualization</div>
+            <div id="loading">Loading flight data...</div>
+            
+            <!-- Legend Toggle Button -->
+            <button class="legend-toggle-btn" id="legendToggle">Show Legend</button>
+            
+            <!-- Color Legend -->
+            <div class="color-legend hidden" id="colorLegend">
+                <h4 id="legendTitle">Flight Path Coloring</h4>
+                
+                <!-- Parameter Selection -->
+                <div class="parameter-selector">
+                    <h5>Color Parameter</h5>
+                    <div class="parameter-buttons">
+                        <div class="parameter-btn active" data-parameter="altitude">Altitude</div>
+                        <div class="parameter-btn" data-parameter="pressure">Pressure</div>
+                        <div class="parameter-btn" data-parameter="temperature">Temperature</div>
+                    </div>
+                </div>
+                
+                <div id="legendItems">
+                    <!-- Legend items will be dynamically generated -->
+                </div>
+                <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 12px; color: #666;">
+                    <div id="parameterRange">Range: Loading...</div>
+                </div>
+            </div>
+            
+            <!-- Path Navigation Controls (moved here from bottom) -->
+            <div class="path-navigation">
+                <h3>Path Navigation</h3>
+                <div class="segment-buttons" id="segmentButtons">
+                    <!-- Segment buttons removed, just prev/next buttons kept -->
+                </div>
+                <div style="margin-top: 10px;">
+                    <button id="prevSegment">← Prev</button>
+                    <button id="nextSegment">Next →</button>
+                </div>
+                <div style="margin-top: 10px; border-top: 1px solid #666; padding-top: 10px;">
+                    <button id="resetTimeSelection" style="background-color: #FF6B6B; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Reset Time Selection</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map Section (25%) -->
+        <div class="section-map">
+            <button class="maximize-btn" data-section="map" title="Maximize Map">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+            </button>
+            <h3>Geographic Flight Path</h3>
+            <div style="font-size: 9px; color: #666; text-align: center; margin-bottom: 2px; line-height: 1.2;">
+                🗺️ Real geographic location • Colors match altitude • Click markers for details
+            </div>
+            <div id="map"></div>
+        </div>
+        
+        <!-- Magnetometer Chart Section -->
+            <div class="graph-section">
+                <button class="maximize-btn" data-section="magnetometer" title="Maximize Magnetometer Chart">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                    </svg>
+                </button>
+                <h3 id="chart1Title">Magnetometer vs Time</h3>
+                <canvas id="magnetometerChart"></canvas>
+                <div style="text-align: center; margin-top: 10px;">
+                    <label for="chart1Parameter" style="font-size: 12px; margin-right: 8px;">Parameter:</label>
+                    <select id="chart1Parameter" style="padding: 4px 8px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="magnetometer">Magnetometer</option>
+                        <option value="accelerometer">Accelerometer</option>
+                        <option value="altitude">Altitude</option>
+                        <option value="pressure">Pressure</option>
+                        <option value="temperature">Temperature</option>
+                    </select>
+                </div>
+            </div>
+        
+        <!-- Accelerometer Chart Section -->
+            <div class="graph-section">
+                <button class="maximize-btn" data-section="accelerometer" title="Maximize Accelerometer Chart">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                    </svg>
+                </button>
+                <h3 id="chart2Title">Accelerometer vs Time</h3>
+                <canvas id="accelerometerChart"></canvas>
+                <div style="text-align: center; margin-top: 10px;">
+                    <label for="chart2Parameter" style="font-size: 12px; margin-right: 8px;">Parameter:</label>
+                    <select id="chart2Parameter" style="padding: 4px 8px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="magnetometer">Magnetometer</option>
+                        <option value="accelerometer" selected>Accelerometer</option>
+                        <option value="altitude">Altitude</option>
+                        <option value="pressure">Pressure</option>
+                        <option value="temperature">Temperature</option>
+                    </select>
+                </div>
+        </div>
+    </div>
+
+    <!-- Add tooltip div for hover information -->
+    <div id="tooltip"></div>
+
+    <!-- External Library Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Leaflet CSS and JS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Main Application Script -->
+    <script src="js/script.js"></script>
+</body>
+</html> 
