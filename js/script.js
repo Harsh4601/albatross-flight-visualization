@@ -1013,6 +1013,53 @@ function resetTimeSelection() {
     }
 }
 
+// Global reset function - resets entire application to initial state
+function globalReset() {
+    console.log("Performing global reset...");
+    
+    // Reset time selection
+    resetTimeSelection();
+    
+    // Reset chart parameters to default
+    const chart1Select = document.getElementById('chart1Parameter');
+    const chart2Select = document.getElementById('chart2Parameter');
+    if (chart1Select && chart1Select.value !== 'magnetometer') {
+        chart1Select.value = 'magnetometer';
+        chart1Select.dispatchEvent(new Event('change'));
+    }
+    if (chart2Select && chart2Select.value !== 'accelerometer') {
+        chart2Select.value = 'accelerometer';
+        chart2Select.dispatchEvent(new Event('change'));
+    }
+    
+    // Reset 3D visualization parameter to altitude
+    const activeParamBtn = document.querySelector('.parameter-btn.active');
+    if (activeParamBtn && activeParamBtn.getAttribute('data-parameter') !== 'altitude') {
+        const altitudeBtn = document.querySelector('.parameter-btn[data-parameter="altitude"]');
+        if (altitudeBtn) {
+            altitudeBtn.click();
+        }
+    }
+    
+    // Reset 3D camera view if possible
+    if (window.camera && window.controls) {
+        // Reset camera position to a default view
+        window.camera.position.set(0, 500, 1000);
+        window.controls.target.set(0, 0, 0);
+        window.controls.update();
+    }
+    
+    // Reset map view to show full path
+    if (window.map && window.currentGpsData && window.currentGpsData.length > 0) {
+        const bounds = L.latLngBounds(
+            window.currentGpsData.map(point => [point.latitude, point.longitude])
+        );
+        window.map.fitBounds(bounds, { padding: [50, 50] });
+    }
+    
+    console.log("Global reset completed");
+}
+
 // Function to extract all parameter data from CSV
 function extractAllParameterData(data) {
     const timeLabels = [];
@@ -3415,10 +3462,14 @@ function initPathNavigation() {
         focusOnSegment(currentSegmentIndex);
     });
     
-    // Set up reset time selection button
-    document.getElementById('resetTimeSelection').addEventListener('click', () => {
-        resetTimeSelection();
-    });
+    // Set up global reset button
+    const globalResetBtn = document.getElementById('globalResetBtn');
+    if (globalResetBtn) {
+        globalResetBtn.classList.remove('hidden');
+        globalResetBtn.addEventListener('click', () => {
+            globalReset();
+        });
+    }
     
     // Initialize with the first segment
     if (pathSegments.length > 0) {

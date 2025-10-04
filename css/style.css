@@ -1194,4 +1194,64 @@ body {
     color: #2563eb;
 }
 
+/* Global Reset Button */
+.global-reset-btn {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15000;
+    background: linear-gradient(135deg, #FF6B6B, #EE5A52);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 
+        0 8px 25px rgba(255, 107, 107, 0.4),
+        0 4px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.global-reset-btn:hover {
+    transform: translateX(-50%) translateY(-3px);
+    box-shadow: 
+        0 12px 35px rgba(255, 107, 107, 0.6),
+        0 6px 15px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #EE5A52, #FF6B6B);
+}
+
+.global-reset-btn:active {
+    transform: translateX(-50%) translateY(-1px);
+}
+
+.global-reset-btn.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.global-reset-btn svg {
+    animation: rotateIcon 2s ease-in-out infinite;
+}
+
+@keyframes rotateIcon {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-15deg); }
+    75% { transform: rotate(15deg); }
+}
+
+.global-reset-btn:hover svg {
+    animation: none;
+    transform: rotate(-360deg);
+    transition: transform 0.6s ease;
+}
+
 /* Animations removed to prevent loading appearance during interactions */
