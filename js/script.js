@@ -1957,6 +1957,7 @@ function addTimeSelectionToChart(chart, chartType) {
         const canvasRect = canvas.getBoundingClientRect();
         const chartArea = chart.chartArea;
         const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
         
         // Get the time values for start and end indices
         const startTime = chart.data.labels[selectionStart];
@@ -1970,11 +1971,17 @@ function addTimeSelectionToChart(chart, chartType) {
         const right = Math.max(startPixel, endPixel);
         const width = right - left;
         
-        // Position overlay within chart area
+        // Use y-axis scale bounds to get exact plot area
+        const yMin = yScale.max;
+        const yMax = yScale.min;
+        const topPixel = yScale.getPixelForValue(yMin);
+        const bottomPixel = yScale.getPixelForValue(yMax);
+        
+        // Position overlay using y-axis scale coordinates
         selectionOverlay.style.left = `${left}px`;
-        selectionOverlay.style.top = `${chartArea.top}px`;
+        selectionOverlay.style.top = `${topPixel}px`;
         selectionOverlay.style.width = `${width}px`;
-        selectionOverlay.style.height = `${chartArea.bottom - chartArea.top}px`;
+        selectionOverlay.style.height = `${bottomPixel - topPixel}px`;
     }
 
     // Mouse down event
@@ -2136,15 +2143,22 @@ function addSynchronizedHoverLine(chart, chartType) {
         if (!chartArea) return;
 
         const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
         const pixelX = xScale.getPixelForValue(timeValue);
         
         if (pixelX >= chartArea.left && pixelX <= chartArea.right) {
             const line = createHoverLine();
             
-            // Position directly using chart area coordinates
+            // Use y-axis scale bounds to get exact plot area
+            const yMin = yScale.max;
+            const yMax = yScale.min;
+            const topPixel = yScale.getPixelForValue(yMin);
+            const bottomPixel = yScale.getPixelForValue(yMax);
+            
+            // Position using y-axis scale coordinates
             line.style.left = `${pixelX}px`;
-            line.style.top = `${chartArea.top}px`;
-            line.style.height = `${chartArea.bottom - chartArea.top}px`;
+            line.style.top = `${topPixel}px`;
+            line.style.height = `${bottomPixel - topPixel}px`;
             line.style.display = 'block';
         }
     }
@@ -2209,13 +2223,20 @@ function addSynchronizedHoverLine(chart, chartType) {
         if (!chartArea || !targetHoverLine) return;
 
         const xScale = targetChart.scales.x;
+        const yScale = targetChart.scales.y;
         const pixelX = xScale.getPixelForValue(timeValue);
         
         if (pixelX >= chartArea.left && pixelX <= chartArea.right) {
-            // Position directly using chart area coordinates
+            // Use y-axis scale bounds to get exact plot area
+            const yMin = yScale.max;
+            const yMax = yScale.min;
+            const topPixel = yScale.getPixelForValue(yMin);
+            const bottomPixel = yScale.getPixelForValue(yMax);
+            
+            // Position using y-axis scale coordinates
             targetHoverLine.style.left = `${pixelX}px`;
-            targetHoverLine.style.top = `${chartArea.top}px`;
-            targetHoverLine.style.height = `${chartArea.bottom - chartArea.top}px`;
+            targetHoverLine.style.top = `${topPixel}px`;
+            targetHoverLine.style.height = `${bottomPixel - topPixel}px`;
             targetHoverLine.style.display = 'block';
         }
     }
