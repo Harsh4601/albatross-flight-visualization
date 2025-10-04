@@ -1904,10 +1904,18 @@ function addTimeSelectionToChart(chart, chartType) {
     let selectionEnd = null;
     let selectionOverlay = null;
 
-    // Create selection overlay div (DISABLED - no visual selection overlay)
+    // Create selection overlay div
     function createSelectionOverlay() {
-        // Return null to disable visual selection overlay
-        return null;
+        const overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.backgroundColor = 'rgba(54, 162, 235, 0.2)'; // Translucent blue
+        overlay.style.border = '1px solid rgba(54, 162, 235, 0.5)';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '10';
+        overlay.setAttribute('data-selection-overlay', 'true');
+        canvas.parentElement.style.position = 'relative';
+        canvas.parentElement.appendChild(overlay);
+        return overlay;
     }
 
     // Get time value from pixel position
@@ -1939,6 +1947,33 @@ function addTimeSelectionToChart(chart, chartType) {
         return closestIndex;
     }
 
+    // Update selection overlay position and size
+    function updateSelectionOverlay() {
+        if (!selectionOverlay || selectionStart === null || selectionEnd === null) return;
+        
+        const canvasRect = canvas.getBoundingClientRect();
+        const chartArea = chart.chartArea;
+        const xScale = chart.scales.x;
+        
+        // Get the time values for start and end indices
+        const startTime = chart.data.labels[selectionStart];
+        const endTime = chart.data.labels[selectionEnd];
+        
+        // Convert to pixel positions
+        const startPixel = xScale.getPixelForValue(startTime);
+        const endPixel = xScale.getPixelForValue(endTime);
+        
+        const left = Math.min(startPixel, endPixel);
+        const right = Math.max(startPixel, endPixel);
+        const width = right - left;
+        
+        // Position overlay within chart area
+        selectionOverlay.style.left = `${left}px`;
+        selectionOverlay.style.top = `${chartArea.top}px`;
+        selectionOverlay.style.width = `${width}px`;
+        selectionOverlay.style.height = `${chartArea.bottom - chartArea.top}px`;
+    }
+
     // Mouse down event
     canvas.addEventListener('mousedown', (e) => {
         const timeIndex = getTimeFromPixel(e.clientX);
@@ -1950,7 +1985,8 @@ function addTimeSelectionToChart(chart, chartType) {
             // Clean up any existing selection overlays first
             cleanupSelectionOverlays(canvas);
             
-            // No visual overlay - selection will work without visual feedback
+            // Create visual overlay
+            selectionOverlay = createSelectionOverlay();
             
             // Prevent default chart interactions
             e.preventDefault();
@@ -1964,7 +2000,8 @@ function addTimeSelectionToChart(chart, chartType) {
             const timeIndex = getTimeFromPixel(e.clientX);
             if (timeIndex !== null) {
                 selectionEnd = timeIndex;
-                // No visual overlay to update
+                // Update visual overlay
+                updateSelectionOverlay();
             }
         }
     });
@@ -1980,12 +2017,30 @@ function addTimeSelectionToChart(chart, chartType) {
                 onTimeRangeSelected(startTime, endTime, chartType);
             }
             
-            // No overlay to clean up
+            // Clean up overlay
+            if (selectionOverlay && selectionOverlay.parentElement) {
+                selectionOverlay.parentElement.removeChild(selectionOverlay);
+            }
         }
         
         isSelecting = false;
         selectionStart = null;
         selectionEnd = null;
+        selectionOverlay = null;
+    });
+
+    // Mouse leave event - clean up if dragging outside canvas
+    canvas.addEventListener('mouseleave', (e) => {
+        if (isSelecting && selectionOverlay) {
+            // Clean up overlay
+            if (selectionOverlay.parentElement) {
+                selectionOverlay.parentElement.removeChild(selectionOverlay);
+            }
+            isSelecting = false;
+            selectionStart = null;
+            selectionEnd = null;
+            selectionOverlay = null;
+        }
     });
 }
 
