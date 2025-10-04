@@ -340,7 +340,7 @@ body {
 
 .graph-section canvas {
     width: 100% !important;
-    height: calc(100% - 90px) !important;
+    height: calc(100% - 140px) !important;
     border-radius: 10px;
 }
 
