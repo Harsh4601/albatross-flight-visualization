@@ -898,6 +898,18 @@ body {
         padding: 6px;
     }
     
+    .global-reset-btn {
+        bottom: 15px;
+        right: 15px;
+        padding: 10px 20px;
+        font-size: 13px;
+    }
+    
+    .global-reset-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+    
     .path-navigation {
         top: 10px;
         right: 10px;
@@ -1197,21 +1209,20 @@ body {
 /* Global Reset Button */
 .global-reset-btn {
     position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 30px;
+    right: 30px;
     z-index: 15000;
     background: linear-gradient(135deg, #FF6B6B, #EE5A52);
     color: white;
     border: none;
-    padding: 12px 24px;
+    padding: 14px 28px;
     border-radius: 50px;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     box-shadow: 
         0 8px 25px rgba(255, 107, 107, 0.4),
         0 4px 10px rgba(0, 0, 0, 0.2);
@@ -1221,7 +1232,7 @@ body {
 }
 
 .global-reset-btn:hover {
-    transform: translateX(-50%) translateY(-3px);
+    transform: translateY(-3px) scale(1.05);
     box-shadow: 
         0 12px 35px rgba(255, 107, 107, 0.6),
         0 6px 15px rgba(0, 0, 0, 0.3);
@@ -1229,7 +1240,7 @@ body {
 }
 
 .global-reset-btn:active {
-    transform: translateX(-50%) translateY(-1px);
+    transform: translateY(-1px) scale(1.02);
 }
 
 .global-reset-btn.hidden {
