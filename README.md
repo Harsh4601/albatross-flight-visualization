@@ -6,20 +6,19 @@ This project visualizes albatross flight paths using 3D graphics, interactive ch
 
 ```
 albatross-flight-visualization/
-├── albatross_flight_visualization.html    # Main HTML file
+├── index.html                           # Main HTML file
 ├── css/
-│   └── style.css                         # All CSS styles
+│   └── style.css                        # All CSS styles
 ├── js/
-│   └── script.js                         # Main JavaScript application
+│   └── script.js                        # Main JavaScript application
 ├── assets/
-│   ├── detailed.csv                      # Primary flight data
-│   └── merged_input.csv                  # Additional data file
+│   └── detailed.csv                     # Primary flight data
 └── README.md                            # This file
 ```
 
 ## Files Description
 
-### HTML (`albatross_flight_visualization.html`)
+### HTML (`index.html`)
 - Clean HTML structure with semantic markup
 - References external CSS and JavaScript files
 - Contains the layout for 3D visualization, charts, and controls
@@ -53,12 +52,16 @@ albatross-flight-visualization/
 
 ## Usage
 
-1. Open `albatross_flight_visualization.html` in a web browser
+1. Open `index.html` in a web browser
 2. Wait for the flight data to load
 3. Interact with the 3D visualization using mouse controls
 4. Select time ranges on the charts to focus the 3D view
 5. Use navigation buttons to move through flight segments
 6. Hover over flight paths for detailed sensor data
+
+## Deployment
+
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for instructions on how to deploy this project online for free using GitHub Pages, Netlify, or other platforms.
 
 ## Dependencies
 
