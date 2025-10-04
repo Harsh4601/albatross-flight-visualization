@@ -111,11 +111,9 @@
                         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
                     </svg>
                 </button>
-                <h3 id="chart1Title">Magnetometer vs Time</h3>
-                <canvas id="magnetometerChart"></canvas>
-                <div style="text-align: center; margin-top: 10px;">
-                    <label for="chart1Parameter" style="font-size: 12px; margin-right: 8px;">Parameter:</label>
-                    <select id="chart1Parameter" style="padding: 4px 8px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;">
+                <div class="parameter-selector-top">
+                    <label for="chart1Parameter">Parameter:</label>
+                    <select id="chart1Parameter">
                         <option value="magnetometer">Magnetometer</option>
                         <option value="accelerometer">Accelerometer</option>
                         <option value="altitude">Altitude</option>
@@ -123,6 +121,8 @@
                         <option value="temperature">Temperature</option>
                     </select>
                 </div>
+                <h3 id="chart1Title">Magnetometer vs Time</h3>
+                <canvas id="magnetometerChart"></canvas>
             </div>
         
         <!-- Accelerometer Chart Section -->
@@ -132,11 +132,9 @@
                         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
                     </svg>
                 </button>
-                <h3 id="chart2Title">Accelerometer vs Time</h3>
-                <canvas id="accelerometerChart"></canvas>
-                <div style="text-align: center; margin-top: 10px;">
-                    <label for="chart2Parameter" style="font-size: 12px; margin-right: 8px;">Parameter:</label>
-                    <select id="chart2Parameter" style="padding: 4px 8px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;">
+                <div class="parameter-selector-top">
+                    <label for="chart2Parameter">Parameter:</label>
+                    <select id="chart2Parameter">
                         <option value="magnetometer">Magnetometer</option>
                         <option value="accelerometer" selected>Accelerometer</option>
                         <option value="altitude">Altitude</option>
@@ -144,6 +142,8 @@
                         <option value="temperature">Temperature</option>
                     </select>
                 </div>
+                <h3 id="chart2Title">Accelerometer vs Time</h3>
+                <canvas id="accelerometerChart"></canvas>
         </div>
     </div>
 

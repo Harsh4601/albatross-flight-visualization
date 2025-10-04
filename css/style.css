@@ -1108,7 +1108,60 @@ body {
     right: 26px;
 }
 
-/* Parameter selection dropdown styles */
+/* Parameter selection positioned at top left */
+.parameter-selector-top {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 
+        0 6px 20px rgba(0, 0, 0, 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.parameter-selector-top label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #2563eb;
+    white-space: nowrap;
+}
+
+.parameter-selector-top select {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(37, 99, 235, 0.3);
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2563eb;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.3s ease;
+    min-width: 130px;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+}
+
+.parameter-selector-top select:hover {
+    border-color: #2563eb;
+    background: white;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.parameter-selector-top select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Old parameter selection styles (kept for compatibility) */
 .graph-section select {
     background: rgba(255, 255, 255, 0.9);
     border: 2px solid rgba(37, 99, 235, 0.3);
@@ -1139,21 +1192,6 @@ body {
 .graph-section label {
     font-weight: 600;
     color: #2563eb;
-}
-
-/* Ensure dropdown containers are visible */
-.graph-section > div:last-child {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 10;
-    position: relative;
-    margin-top: 8px;
-    margin-bottom: 5px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
 }
 
 /* Animations removed to prevent loading appearance during interactions */
