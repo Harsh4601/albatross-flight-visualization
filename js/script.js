@@ -1910,8 +1910,11 @@ function addTimeSelectionToChart(chart, chartType) {
         overlay.style.position = 'absolute';
         overlay.style.backgroundColor = 'rgba(54, 162, 235, 0.2)'; // Translucent blue
         overlay.style.border = '1px solid rgba(54, 162, 235, 0.5)';
+        overlay.style.borderTop = 'none';
+        overlay.style.borderBottom = 'none';
         overlay.style.pointerEvents = 'none';
-        overlay.style.zIndex = '10';
+        overlay.style.zIndex = '1000';
+        overlay.style.boxSizing = 'border-box';
         overlay.setAttribute('data-selection-overlay', 'true');
         canvas.parentElement.style.position = 'relative';
         canvas.parentElement.appendChild(overlay);
