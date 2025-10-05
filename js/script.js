@@ -7,6 +7,7 @@ let bird;
 
 // Function to initialize Three.js scene
 function initThreeJS() {
+    console.log('Initializing Three.js...');
     const containerElement = document.getElementById('container');
     
     if (!containerElement) {
@@ -14,48 +15,72 @@ function initThreeJS() {
         return false;
     }
     
-    // Scene setup
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff); // White background
+    // Clear container to ensure clean start
+    containerElement.innerHTML = '';
     
-    // Camera setup - adjusted for 25% height layout (2x2 grid)
-    camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.5) / (window.innerHeight * 0.5), 0.1, 2000);
-    camera.position.set(50, 50, 50); // Increased position values for a more zoomed-out view
+    // Make sure previous Three.js objects are cleaned up
+    if (scene) {
+        console.log('Cleaning up existing scene before reinit');
+        scene = null;
+    }
+    if (renderer) {
+        console.log('Cleaning up existing renderer before reinit');
+        renderer.dispose();
+        renderer = null;
+    }
+    if (controls) {
+        controls.dispose();
+        controls = null;
+    }
     
-    // Renderer setup - adjusted for 25% height layout (2x2 grid)
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth * 0.5, window.innerHeight * 0.5);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    containerElement.appendChild(renderer.domElement);
-    
-    // Controls
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.25;
-    
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(1, 1, 1);
-    scene.add(directionalLight);
-    
-    // Add grid for reference
-    const gridHelper = new THREE.GridHelper(200, 200, 0x888888, 0x444444);
-    gridHelper.position.y = -15;
-    gridHelper.material.opacity = 0.2;
-    gridHelper.material.transparent = true;
-    scene.add(gridHelper);
-    
-    // Create and add bird model
-    bird = createBirdModel();
-    scene.add(bird);
-    
-    // Create ocean
-    createOcean();
-    
-    return true;
+    try {
+        // Scene setup
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff); // White background
+        
+        // Camera setup - adjusted for 25% height layout (2x2 grid)
+        camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.5) / (window.innerHeight * 0.5), 0.1, 2000);
+        camera.position.set(50, 50, 50); // Increased position values for a more zoomed-out view
+        
+        // Renderer setup - adjusted for 25% height layout (2x2 grid)
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth * 0.5, window.innerHeight * 0.5);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        containerElement.appendChild(renderer.domElement);
+        
+        // Controls
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+        
+        // Add grid for reference
+        const gridHelper = new THREE.GridHelper(200, 200, 0x888888, 0x444444);
+        gridHelper.position.y = -15;
+        gridHelper.material.opacity = 0.2;
+        gridHelper.material.transparent = true;
+        scene.add(gridHelper);
+        
+        // Create and add bird model
+        bird = createBirdModel();
+        scene.add(bird);
+        
+        // Create ocean
+        createOcean();
+        
+        console.log('Three.js initialized successfully');
+        return true;
+    } catch (error) {
+        console.error('Error initializing Three.js:', error);
+        return false;
+    }
 }
 
 // Create path material
@@ -3181,13 +3206,23 @@ function processUploadedCSV(file) {
                         
                     } catch (error) {
                         console.error('Error in visualization:', error);
-                        updateProgressText('Error creating visualization. Please try again.');
-                        setTimeout(() => {
-                            const processingOverlay = document.getElementById('processingOverlay');
-                            const welcomeScreen = document.getElementById('welcomeScreen');
+                        console.error('Error stack:', error.stack);
+                        console.error('Error details - Name:', error.name, 'Message:', error.message);
+                        updateProgressText('Error creating visualization: ' + error.message);
+                        
+                        // Clean up and hide processing overlay immediately
+                        const processingOverlay = document.getElementById('processingOverlay');
+                        if (processingOverlay) {
                             processingOverlay.classList.remove('active');
-                            welcomeScreen.classList.remove('hidden');
-                        }, 2000);
+                        }
+                        
+                        // Don't automatically return to welcome screen - let user see the error
+                        alert('Error creating visualization: ' + error.message + '\n\nPlease check the browser console for details and try uploading again.');
+                        
+                        // Now return to welcome screen
+                        setTimeout(() => {
+                            returnToUploadScreen();
+                        }, 500);
                     }
                     
                     // Cleanup worker
@@ -3196,18 +3231,28 @@ function processUploadedCSV(file) {
                     
                 } else if (type === 'ERROR') {
                     console.error('Worker error:', error);
-                    updateProgressText('Error processing data. Please try again.');
-                    setTimeout(() => {
-                        const processingOverlay = document.getElementById('processingOverlay');
-                        const welcomeScreen = document.getElementById('welcomeScreen');
-                        processingOverlay.classList.remove('active');
-                        welcomeScreen.classList.remove('hidden');
-                    }, 2000);
+                    console.error('Worker error details:', e.data);
+                    updateProgressText('Error processing data: ' + error);
                     
+                    // Clean up processing overlay
+                    const processingOverlay = document.getElementById('processingOverlay');
+                    if (processingOverlay) {
+                        processingOverlay.classList.remove('active');
+                    }
+                    
+                    // Show error to user
+                    alert('Error processing data: ' + error + '\n\nPlease try uploading again or check the browser console for details.');
+                    
+                    // Clean up worker
                     if (dataWorker) {
                         dataWorker.terminate();
                         dataWorker = null;
                     }
+                    
+                    // Return to upload screen
+                    setTimeout(() => {
+                        returnToUploadScreen();
+                    }, 500);
                 }
             };
             
@@ -3882,6 +3927,17 @@ window.addEventListener('resize', () => {
 });
 
 // Initialize path segment navigation
+// Store event listener references to allow cleanup
+let navEventListeners = {
+    prevSegment: null,
+    nextSegment: null,
+    floatingMenuBtn: null,
+    closeMenuBtn: null,
+    menuBackdrop: null,
+    menuUploadBtn: null,
+    menuResetBtn: null
+};
+
 function initPathNavigation() {
     const segmentButtonsContainer = document.getElementById('segmentButtons');
     const pathSegments = window.pathSegments;
@@ -3889,20 +3945,31 @@ function initPathNavigation() {
     // Clear existing buttons
     segmentButtonsContainer.innerHTML = '';
     
-    // Don't create numbered segment buttons
+    // Remove old event listeners before adding new ones
+    const prevBtn = document.getElementById('prevSegment');
+    const nextBtn = document.getElementById('nextSegment');
     
-    // Set up next/prev buttons
-    document.getElementById('prevSegment').addEventListener('click', () => {
+    if (prevBtn && navEventListeners.prevSegment) {
+        prevBtn.removeEventListener('click', navEventListeners.prevSegment);
+    }
+    if (nextBtn && navEventListeners.nextSegment) {
+        nextBtn.removeEventListener('click', navEventListeners.nextSegment);
+    }
+    
+    // Set up next/prev buttons with new listeners
+    navEventListeners.prevSegment = () => {
         currentSegmentIndex = (currentSegmentIndex - 1 + pathSegments.length) % pathSegments.length;
         focusOnSegment(currentSegmentIndex);
-    });
-    
-    document.getElementById('nextSegment').addEventListener('click', () => {
+    };
+    navEventListeners.nextSegment = () => {
         currentSegmentIndex = (currentSegmentIndex + 1) % pathSegments.length;
         focusOnSegment(currentSegmentIndex);
-    });
+    };
     
-    // Set up floating menu
+    if (prevBtn) prevBtn.addEventListener('click', navEventListeners.prevSegment);
+    if (nextBtn) nextBtn.addEventListener('click', navEventListeners.nextSegment);
+    
+    // Set up floating menu - only if not already set up
     const floatingMenuBtn = document.getElementById('floatingMenuBtn');
     const floatingMenu = document.getElementById('floatingMenu');
     const menuBackdrop = document.getElementById('menuBackdrop');
@@ -3910,51 +3977,58 @@ function initPathNavigation() {
     const menuUploadBtn = document.getElementById('menuUploadBtn');
     const menuResetBtn = document.getElementById('menuResetBtn');
     
+    // Remove old listeners
+    if (floatingMenuBtn && navEventListeners.floatingMenuBtn) {
+        floatingMenuBtn.removeEventListener('click', navEventListeners.floatingMenuBtn);
+    }
+    if (closeMenuBtn && navEventListeners.closeMenuBtn) {
+        closeMenuBtn.removeEventListener('click', navEventListeners.closeMenuBtn);
+    }
+    if (menuBackdrop && navEventListeners.menuBackdrop) {
+        menuBackdrop.removeEventListener('click', navEventListeners.menuBackdrop);
+    }
+    if (menuUploadBtn && navEventListeners.menuUploadBtn) {
+        menuUploadBtn.removeEventListener('click', navEventListeners.menuUploadBtn);
+    }
+    if (menuResetBtn && navEventListeners.menuResetBtn) {
+        menuResetBtn.removeEventListener('click', navEventListeners.menuResetBtn);
+    }
+    
+    // Create new listeners
+    navEventListeners.floatingMenuBtn = () => toggleFloatingMenu();
+    navEventListeners.closeMenuBtn = () => closeFloatingMenu();
+    navEventListeners.menuBackdrop = () => closeFloatingMenu();
+    navEventListeners.menuUploadBtn = () => {
+        closeFloatingMenu();
+        setTimeout(() => returnToUploadScreen(), 200);
+    };
+    navEventListeners.menuResetBtn = () => {
+        closeFloatingMenu();
+        setTimeout(() => globalReset(), 200);
+    };
+    
+    // Attach new listeners
     if (floatingMenuBtn) {
         floatingMenuBtn.classList.remove('hidden');
-        
-        // Toggle menu on button click
-        floatingMenuBtn.addEventListener('click', () => {
-            toggleFloatingMenu();
-        });
+        floatingMenuBtn.addEventListener('click', navEventListeners.floatingMenuBtn);
     }
-    
-    // Close menu button
     if (closeMenuBtn) {
-        closeMenuBtn.addEventListener('click', () => {
-            closeFloatingMenu();
-        });
+        closeMenuBtn.addEventListener('click', navEventListeners.closeMenuBtn);
     }
-    
-    // Close menu on backdrop click
     if (menuBackdrop) {
-        menuBackdrop.addEventListener('click', () => {
-            closeFloatingMenu();
-        });
+        menuBackdrop.addEventListener('click', navEventListeners.menuBackdrop);
     }
-    
-    // Upload new CSV action
     if (menuUploadBtn) {
-        menuUploadBtn.addEventListener('click', () => {
-            closeFloatingMenu();
-            setTimeout(() => {
-                returnToUploadScreen();
-            }, 200);
-        });
+        menuUploadBtn.addEventListener('click', navEventListeners.menuUploadBtn);
+    }
+    if (menuResetBtn) {
+        menuResetBtn.addEventListener('click', navEventListeners.menuResetBtn);
     }
     
-    // Reset view action
-    if (menuResetBtn) {
-        menuResetBtn.addEventListener('click', () => {
-            closeFloatingMenu();
-            setTimeout(() => {
-                globalReset();
-            }, 200);
-        });
-    }
+    console.log('Path navigation initialized');
     
     // Initialize with the first segment
-    if (pathSegments.length > 0) {
+    if (pathSegments && pathSegments.length > 0) {
         focusOnSegment(0);
     }
 }
