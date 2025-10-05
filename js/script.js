@@ -509,7 +509,29 @@ function createGroundGrid(minX, maxX, minZ, maxZ) {
 
 // Function to create the geographic map
 function createMap(gpsData) {
-    if (!gpsData || gpsData.length === 0) return;
+    if (!gpsData || gpsData.length === 0) {
+        console.error('No GPS data provided to createMap');
+        return;
+    }
+    
+    console.log('Creating map with', gpsData.length, 'GPS points');
+    
+    // Make sure map container exists
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+        throw new Error('Map container not found');
+    }
+    
+    // If map already exists, remove it first
+    if (window.map) {
+        console.log('Removing existing map instance');
+        try {
+            window.map.remove();
+        } catch (e) {
+            console.warn('Error removing old map:', e);
+        }
+        window.map = null;
+    }
     
     // Calculate center and bounds of the flight path
     let minLat = Infinity, maxLat = -Infinity;
@@ -525,8 +547,16 @@ function createMap(gpsData) {
     const centerLat = (minLat + maxLat) / 2;
     const centerLon = (minLon + maxLon) / 2;
     
+    console.log('Map center:', centerLat, centerLon);
+    
     // Initialize map
-    map = L.map('map').setView([centerLat, centerLon], 10);
+    try {
+        map = L.map('map').setView([centerLat, centerLon], 10);
+        console.log('Map created successfully');
+    } catch (error) {
+        console.error('Error creating Leaflet map:', error);
+        throw error;
+    }
     
     // Add OpenStreetMap tile layer (free)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1218,8 +1248,21 @@ function returnToUploadScreen() {
     
     // Clean up map
     if (window.map) {
-        window.map.remove();
+        console.log('Cleaning up existing map');
+        try {
+            window.map.remove();
+        } catch (e) {
+            console.warn('Error removing map during cleanup:', e);
+        }
         window.map = null;
+    }
+    if (typeof map !== 'undefined' && map !== null) {
+        try {
+            map.remove();
+        } catch (e) {
+            console.warn('Error removing global map during cleanup:', e);
+        }
+        map = null;
     }
     
     // Clean up charts
@@ -1248,17 +1291,11 @@ function returnToUploadScreen() {
         }
     }
     
-    // Clear map container
-    const mapContainer = document.getElementById('map');
-    if (mapContainer) {
-        mapContainer.innerHTML = '';
-    }
+    // DON'T clear map container HTML - Leaflet needs the div element
+    // The map instance was already removed above with map.remove()
     
-    // Clear 3D container
-    const container = document.getElementById('container');
-    if (container) {
-        container.innerHTML = '';
-    }
+    // DON'T clear 3D container HTML yet - will be cleared in initThreeJS
+    // The renderer was already cleaned up above
     
     // Clear global data
     window.sensorData = null;
@@ -1293,13 +1330,28 @@ function returnToUploadScreen() {
     }
     
     // Reset map-related variables
-    if (typeof flightPathLayer !== 'undefined') {
+    if (typeof flightPathLayer !== 'undefined' && flightPathLayer !== null) {
+        try {
+            flightPathLayer.clearLayers();
+        } catch (e) {
+            console.warn('Error clearing flight path layer:', e);
+        }
         flightPathLayer = null;
     }
-    if (typeof markersLayer !== 'undefined') {
+    if (typeof markersLayer !== 'undefined' && markersLayer !== null) {
+        try {
+            markersLayer.clearLayers();
+        } catch (e) {
+            console.warn('Error clearing markers layer:', e);
+        }
         markersLayer = null;
     }
-    if (typeof mapHighlightLayer !== 'undefined') {
+    if (typeof mapHighlightLayer !== 'undefined' && mapHighlightLayer !== null) {
+        try {
+            mapHighlightLayer.clearLayers();
+        } catch (e) {
+            console.warn('Error clearing highlight layer:', e);
+        }
         mapHighlightLayer = null;
     }
     
