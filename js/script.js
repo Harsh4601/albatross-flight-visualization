@@ -1060,6 +1060,92 @@ function globalReset() {
     console.log("Global reset completed");
 }
 
+// Function to return to upload screen (for Upload New CSV button)
+function returnToUploadScreen() {
+    console.log("Returning to upload screen...");
+    
+    // Hide main container
+    const mainContainer = document.getElementById('mainContainer');
+    if (mainContainer) {
+        mainContainer.classList.add('hidden');
+    }
+    
+    // Hide buttons
+    const globalResetBtn = document.getElementById('globalResetBtn');
+    const uploadNewBtn = document.getElementById('uploadNewBtn');
+    if (globalResetBtn) {
+        globalResetBtn.classList.add('hidden');
+    }
+    if (uploadNewBtn) {
+        uploadNewBtn.classList.add('hidden');
+    }
+    
+    // Show welcome screen
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    if (welcomeScreen) {
+        welcomeScreen.classList.remove('hidden');
+    }
+    
+    // Reset file input
+    const fileInput = document.getElementById('csvFileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    if (fileInfo) {
+        fileInfo.textContent = 'No file selected';
+    }
+    
+    // Clean up Three.js scene if it exists
+    if (window.scene) {
+        // Remove all objects from scene
+        while(window.scene.children.length > 0) {
+            const object = window.scene.children[0];
+            if (object.geometry) object.geometry.dispose();
+            if (object.material) {
+                if (Array.isArray(object.material)) {
+                    object.material.forEach(material => material.dispose());
+                } else {
+                    object.material.dispose();
+                }
+            }
+            window.scene.remove(object);
+        }
+    }
+    
+    // Clean up renderer
+    if (window.renderer && window.renderer.domElement && window.renderer.domElement.parentNode) {
+        window.renderer.domElement.parentNode.removeChild(window.renderer.domElement);
+        window.renderer.dispose();
+        window.renderer = null;
+    }
+    
+    // Clean up map
+    if (window.map) {
+        window.map.remove();
+        window.map = null;
+    }
+    
+    // Clean up charts
+    if (window.chart1Instance) {
+        window.chart1Instance.destroy();
+        window.chart1Instance = null;
+    }
+    if (window.chart2Instance) {
+        window.chart2Instance.destroy();
+        window.chart2Instance = null;
+    }
+    
+    // Clear global data
+    window.sensorData = null;
+    window.flightData = null;
+    window.allParameterData = null;
+    window.originalChartData = null;
+    window.pathSegments = null;
+    
+    console.log("Returned to upload screen, ready for new CSV");
+}
+
 // Function to extract all parameter data from CSV
 function extractAllParameterData(data) {
     const timeLabels = [];
@@ -3638,7 +3724,7 @@ function initPathNavigation() {
     if (uploadNewBtn) {
         uploadNewBtn.classList.remove('hidden');
         uploadNewBtn.addEventListener('click', () => {
-            globalReset();
+            returnToUploadScreen();
         });
     }
     
