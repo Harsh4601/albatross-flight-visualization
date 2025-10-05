@@ -910,6 +910,18 @@ body {
         height: 16px;
     }
     
+    .upload-new-btn {
+        top: 15px;
+        left: 15px;
+        padding: 10px 18px;
+        font-size: 13px;
+    }
+    
+    .upload-new-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+    
     .path-navigation {
         top: 10px;
         right: 10px;
@@ -1204,6 +1216,66 @@ body {
 .graph-section label {
     font-weight: 600;
     color: #2563eb;
+}
+
+/* Upload New CSV Button */
+.upload-new-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 4px 15px rgba(102, 126, 234, 0.4),
+        0 2px 8px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.upload-new-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 
+        0 12px 35px rgba(102, 126, 234, 0.6),
+        0 6px 15px rgba(118, 75, 162, 0.4);
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.upload-new-btn:active {
+    transform: translateY(-1px) scale(1.02);
+}
+
+.upload-new-btn.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-20px);
+}
+
+.upload-new-btn svg {
+    animation: bounceUpload 2s ease-in-out infinite;
+}
+
+@keyframes bounceUpload {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+.upload-new-btn:hover svg {
+    animation: none;
+    transform: translateY(-2px);
+    transition: transform 0.3s ease;
 }
 
 /* Global Reset Button */

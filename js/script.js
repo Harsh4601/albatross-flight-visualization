@@ -3633,6 +3633,15 @@ function initPathNavigation() {
         });
     }
     
+    // Set up upload new CSV button
+    const uploadNewBtn = document.getElementById('uploadNewBtn');
+    if (uploadNewBtn) {
+        uploadNewBtn.classList.remove('hidden');
+        uploadNewBtn.addEventListener('click', () => {
+            globalReset();
+        });
+    }
+    
     // Initialize with the first segment
     if (pathSegments.length > 0) {
         focusOnSegment(0);
