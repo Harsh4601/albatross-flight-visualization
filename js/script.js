@@ -1060,6 +1060,56 @@ function globalReset() {
     console.log("Global reset completed");
 }
 
+// Floating Menu Functions
+function toggleFloatingMenu() {
+    const floatingMenu = document.getElementById('floatingMenu');
+    const menuBackdrop = document.getElementById('menuBackdrop');
+    
+    if (floatingMenu && menuBackdrop) {
+        const isVisible = floatingMenu.classList.contains('show');
+        
+        if (isVisible) {
+            closeFloatingMenu();
+        } else {
+            openFloatingMenu();
+        }
+    }
+}
+
+function openFloatingMenu() {
+    const floatingMenu = document.getElementById('floatingMenu');
+    const menuBackdrop = document.getElementById('menuBackdrop');
+    
+    if (floatingMenu) {
+        floatingMenu.classList.remove('hidden');
+        floatingMenu.classList.add('show');
+    }
+    
+    if (menuBackdrop) {
+        menuBackdrop.classList.remove('hidden');
+        menuBackdrop.classList.add('show');
+    }
+}
+
+function closeFloatingMenu() {
+    const floatingMenu = document.getElementById('floatingMenu');
+    const menuBackdrop = document.getElementById('menuBackdrop');
+    
+    if (floatingMenu) {
+        floatingMenu.classList.remove('show');
+        setTimeout(() => {
+            floatingMenu.classList.add('hidden');
+        }, 300);
+    }
+    
+    if (menuBackdrop) {
+        menuBackdrop.classList.remove('show');
+        setTimeout(() => {
+            menuBackdrop.classList.add('hidden');
+        }, 300);
+    }
+}
+
 // Function to return to upload screen (for Upload New CSV button)
 function returnToUploadScreen() {
     console.log("Returning to upload screen...");
@@ -1070,14 +1120,21 @@ function returnToUploadScreen() {
         mainContainer.classList.add('hidden');
     }
     
-    // Hide buttons
-    const globalResetBtn = document.getElementById('globalResetBtn');
-    const uploadNewBtn = document.getElementById('uploadNewBtn');
-    if (globalResetBtn) {
-        globalResetBtn.classList.add('hidden');
+    // Hide floating menu button and close menu
+    const floatingMenuBtn = document.getElementById('floatingMenuBtn');
+    const floatingMenu = document.getElementById('floatingMenu');
+    const menuBackdrop = document.getElementById('menuBackdrop');
+    
+    if (floatingMenuBtn) {
+        floatingMenuBtn.classList.add('hidden');
     }
-    if (uploadNewBtn) {
-        uploadNewBtn.classList.add('hidden');
+    if (floatingMenu) {
+        floatingMenu.classList.remove('show');
+        floatingMenu.classList.add('hidden');
+    }
+    if (menuBackdrop) {
+        menuBackdrop.classList.remove('show');
+        menuBackdrop.classList.add('hidden');
     }
     
     // Show welcome screen
@@ -3710,21 +3767,54 @@ function initPathNavigation() {
         focusOnSegment(currentSegmentIndex);
     });
     
-    // Set up global reset button
-    const globalResetBtn = document.getElementById('globalResetBtn');
-    if (globalResetBtn) {
-        globalResetBtn.classList.remove('hidden');
-        globalResetBtn.addEventListener('click', () => {
-            globalReset();
+    // Set up floating menu
+    const floatingMenuBtn = document.getElementById('floatingMenuBtn');
+    const floatingMenu = document.getElementById('floatingMenu');
+    const menuBackdrop = document.getElementById('menuBackdrop');
+    const closeMenuBtn = document.getElementById('closeMenuBtn');
+    const menuUploadBtn = document.getElementById('menuUploadBtn');
+    const menuResetBtn = document.getElementById('menuResetBtn');
+    
+    if (floatingMenuBtn) {
+        floatingMenuBtn.classList.remove('hidden');
+        
+        // Toggle menu on button click
+        floatingMenuBtn.addEventListener('click', () => {
+            toggleFloatingMenu();
         });
     }
     
-    // Set up upload new CSV button
-    const uploadNewBtn = document.getElementById('uploadNewBtn');
-    if (uploadNewBtn) {
-        uploadNewBtn.classList.remove('hidden');
-        uploadNewBtn.addEventListener('click', () => {
-            returnToUploadScreen();
+    // Close menu button
+    if (closeMenuBtn) {
+        closeMenuBtn.addEventListener('click', () => {
+            closeFloatingMenu();
+        });
+    }
+    
+    // Close menu on backdrop click
+    if (menuBackdrop) {
+        menuBackdrop.addEventListener('click', () => {
+            closeFloatingMenu();
+        });
+    }
+    
+    // Upload new CSV action
+    if (menuUploadBtn) {
+        menuUploadBtn.addEventListener('click', () => {
+            closeFloatingMenu();
+            setTimeout(() => {
+                returnToUploadScreen();
+            }, 200);
+        });
+    }
+    
+    // Reset view action
+    if (menuResetBtn) {
+        menuResetBtn.addEventListener('click', () => {
+            closeFloatingMenu();
+            setTimeout(() => {
+                globalReset();
+            }, 200);
         });
     }
     
