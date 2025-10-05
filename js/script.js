@@ -1153,11 +1153,17 @@ function returnToUploadScreen() {
         fileInfo.textContent = 'No file selected';
     }
     
+    // Stop animation loop
+    if (typeof animationFrameId !== 'undefined' && animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+    
     // Clean up Three.js scene if it exists
-    if (window.scene) {
+    if (scene) {
         // Remove all objects from scene
-        while(window.scene.children.length > 0) {
-            const object = window.scene.children[0];
+        while(scene.children.length > 0) {
+            const object = scene.children[0];
             if (object.geometry) object.geometry.dispose();
             if (object.material) {
                 if (Array.isArray(object.material)) {
@@ -1166,16 +1172,24 @@ function returnToUploadScreen() {
                     object.material.dispose();
                 }
             }
-            window.scene.remove(object);
+            scene.remove(object);
         }
+        scene = null;
     }
     
     // Clean up renderer
-    if (window.renderer && window.renderer.domElement && window.renderer.domElement.parentNode) {
-        window.renderer.domElement.parentNode.removeChild(window.renderer.domElement);
-        window.renderer.dispose();
-        window.renderer = null;
+    if (renderer) {
+        if (renderer.domElement && renderer.domElement.parentNode) {
+            renderer.domElement.parentNode.removeChild(renderer.domElement);
+        }
+        renderer.dispose();
+        renderer = null;
     }
+    
+    // Reset Three.js variables
+    camera = null;
+    controls = null;
+    bird = null;
     
     // Clean up map
     if (window.map) {
@@ -1193,14 +1207,130 @@ function returnToUploadScreen() {
         window.chart2Instance = null;
     }
     
+    // Clear canvas elements to ensure fresh start
+    const magnetometerCanvas = document.getElementById('magnetometerChart');
+    const accelerometerCanvas = document.getElementById('accelerometerChart');
+    if (magnetometerCanvas) {
+        const ctx = magnetometerCanvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, magnetometerCanvas.width, magnetometerCanvas.height);
+        }
+    }
+    if (accelerometerCanvas) {
+        const ctx = accelerometerCanvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, accelerometerCanvas.width, accelerometerCanvas.height);
+        }
+    }
+    
+    // Clear map container
+    const mapContainer = document.getElementById('map');
+    if (mapContainer) {
+        mapContainer.innerHTML = '';
+    }
+    
+    // Clear 3D container
+    const container = document.getElementById('container');
+    if (container) {
+        container.innerHTML = '';
+    }
+    
     // Clear global data
     window.sensorData = null;
     window.flightData = null;
     window.allParameterData = null;
     window.originalChartData = null;
     window.pathSegments = null;
+    window.currentGpsData = null;
     
-    console.log("Returned to upload screen, ready for new CSV");
+    // Reset global variables at module level
+    if (typeof flightData !== 'undefined') {
+        flightData = [];
+    }
+    if (typeof allParameterData !== 'undefined') {
+        allParameterData = {
+            timeLabels: [],
+            magnetometer: { mx: [], my: [], mz: [] },
+            accelerometer: { ax: [], ay: [], az: [] },
+            altitude: [],
+            pressure: [],
+            temperature: []
+        };
+    }
+    if (typeof originalChartData !== 'undefined') {
+        originalChartData = {
+            magnetometer: null,
+            accelerometer: null,
+            altitude: null,
+            pressure: null,
+            temperature: null
+        };
+    }
+    
+    // Reset map-related variables
+    if (typeof flightPathLayer !== 'undefined') {
+        flightPathLayer = null;
+    }
+    if (typeof markersLayer !== 'undefined') {
+        markersLayer = null;
+    }
+    if (typeof mapHighlightLayer !== 'undefined') {
+        mapHighlightLayer = null;
+    }
+    
+    // Reset chart selection variables
+    if (typeof selectedTimeRange !== 'undefined') {
+        selectedTimeRange = null;
+    }
+    if (typeof isSelectingTime !== 'undefined') {
+        isSelectingTime = false;
+    }
+    
+    // Reset segment variables
+    if (typeof currentSegmentIndex !== 'undefined') {
+        currentSegmentIndex = 0;
+    }
+    if (typeof pathPercentage !== 'undefined') {
+        pathPercentage = 0;
+    }
+    if (typeof originalSegmentMaterials !== 'undefined') {
+        originalSegmentMaterials = [];
+    }
+    
+    // Reset hover line variables
+    if (typeof magnetometerHoverLine !== 'undefined') {
+        magnetometerHoverLine = null;
+    }
+    if (typeof accelerometerHoverLine !== 'undefined') {
+        accelerometerHoverLine = null;
+    }
+    
+    // Reset parameter boundaries
+    if (typeof parameterBoundaries !== 'undefined') {
+        parameterBoundaries = {
+            altitude: { min: 0, max: 100 },
+            pressure: { min: 980, max: 1020 },
+            temperature: { min: -10, max: 30 }
+        };
+    }
+    if (typeof currentColorParameter !== 'undefined') {
+        currentColorParameter = 'altitude';
+    }
+    
+    // Cancel any ongoing Web Worker
+    if (dataWorker) {
+        dataWorker.terminate();
+        dataWorker = null;
+    }
+    
+    // Reset loading display
+    const loadingDiv = document.getElementById('loading');
+    if (loadingDiv) {
+        loadingDiv.style.display = 'block';
+        loadingDiv.innerText = 'Loading flight data...';
+    }
+    
+    console.log("Returned to upload screen, all state cleared, ready for new CSV");
 }
 
 // Function to extract all parameter data from CSV
@@ -3683,13 +3813,18 @@ function createFlightPath(positions, gpsData = null) {
 // Variables for navigation
 let currentSegmentIndex = 0; // Track the current segment
 let pathPercentage = 0; // Track the current position percentage
+let animationFrameId = null; // Track animation frame for cleanup
 
 // Animation loop
 function animate() {
-    requestAnimationFrame(animate);
+    animationFrameId = requestAnimationFrame(animate);
     
     // Safety checks
     if (!renderer || !scene || !camera || !controls) {
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
         return;
     }
     
