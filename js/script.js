@@ -2686,6 +2686,91 @@ function updateProgressText(text) {
     }
 }
 
+// Global variable for Web Worker
+let dataWorker = null;
+
+// Optimized data processing function that works with pre-processed data
+function processDataOptimized(gpsData, accelerometerData, magnetometerData) {
+    console.log(`Processing ${gpsData.length} optimized data points`);
+    
+    // Get GPS-based positions
+    const gpsPositions = convertGpsTo3D(gpsData);
+    
+    // Convert accelerometer data to required format
+    const accelData = [];
+    for (let i = 0; i < accelerometerData.ax.length; i++) {
+        accelData.push({
+            x: accelerometerData.ax[i],
+            y: accelerometerData.ay[i],
+            z: accelerometerData.az[i]
+        });
+    }
+    
+    // Convert magnetometer data to required format
+    const magData = [];
+    for (let i = 0; i < magnetometerData.mx.length; i++) {
+        magData.push({
+            x: magnetometerData.mx[i],
+            y: magnetometerData.my[i],
+            z: magnetometerData.mz[i]
+        });
+    }
+    
+    // Get accelerometer-based positions (for fine motion details)
+    const dt = 0.1;
+    let accelPositions = integrateAcceleration(accelData, magData, dt);
+    
+    // Blend GPS (coarse, accurate) with accelerometer (fine, detailed) positions
+    let positions = blendPositions(gpsPositions, accelPositions, 0.8);
+    
+    // Apply smoothing to the path
+    positions = smoothPath(positions, 0.6);
+    
+    // Calculate orientations based on path and magnetometer data
+    const orientations = calculateOrientation(positions, magData);
+    
+    // Calculate parameter boundaries for all parameters and update color legend
+    calculateParameterBoundaries(gpsData);
+    updateColorLegend(gpsData);
+    
+    // Initialize parameter selection UI
+    initParameterSelection();
+    
+    return {
+        positions: positions,
+        orientations: orientations,
+        gpsData: gpsData
+    };
+}
+
+// Complete the visualization after data processing
+function completeVisualization() {
+    const processingOverlay = document.getElementById('processingOverlay');
+    
+    // Set initial bird position
+    if (flightData && flightData.positions.length > 0) {
+        bird.position.copy(flightData.positions[0]);
+    }
+    
+    updateProgressText('Finalizing visualization...');
+    
+    // Hide loading message
+    document.getElementById('loading').style.display = 'none';
+    
+    setTimeout(() => {
+        processingOverlay.classList.remove('active');
+        
+        // Start animation
+        animate();
+        
+        // Setup raycasting for tooltips
+        setupTooltipRaycasting();
+        
+        // Initialize maximize buttons after all content is loaded
+        initMaximizeButtons();
+    }, 500);
+}
+
 function processUploadedCSV(file) {
     const welcomeScreen = document.getElementById('welcomeScreen');
     const processingOverlay = document.getElementById('processingOverlay');
@@ -2707,83 +2792,160 @@ function processUploadedCSV(file) {
         return;
     }
     
-    // Parse CSV file
+    // Check file size and determine target sample size
+    const fileSizeMB = file.size / (1024 * 1024);
+    let targetSize = 10000; // Default for large files
+    
+    if (fileSizeMB < 1) {
+        targetSize = 50000; // Keep more data for small files
+    } else if (fileSizeMB < 10) {
+        targetSize = 20000;
+    } else if (fileSizeMB < 50) {
+        targetSize = 10000;
+    } else {
+        targetSize = 5000; // Aggressive sampling for very large files
+    }
+    
+    console.log(`File size: ${fileSizeMB.toFixed(2)} MB, Target sample size: ${targetSize}`);
+    updateProgressText(`Reading ${fileSizeMB.toFixed(1)} MB file...`);
+    
+    // Use streaming to parse large CSV files
+    const streamedData = [];
+    let rowCount = 0;
+    let lastUpdateTime = Date.now();
+    
     Papa.parse(file, {
         header: true,
         dynamicTyping: true,
+        worker: false, // We'll use our own worker
+        step: function(row, parser) {
+            streamedData.push(row.data);
+            rowCount++;
+            
+            // Update progress every 500ms to avoid too many UI updates
+            const now = Date.now();
+            if (now - lastUpdateTime > 500) {
+                updateProgressText(`Reading row ${rowCount.toLocaleString()}...`);
+                lastUpdateTime = now;
+            }
+        },
         complete: function(results) {
-            updateProgressText(`Processing ${results.data.length} records...`);
-            document.getElementById('loading').innerText = `Processing ${results.data.length} records...`;
+            console.log(`Loaded ${streamedData.length} rows from CSV`);
+            updateProgressText(`Processing ${streamedData.length.toLocaleString()} records...`);
+            document.getElementById('loading').innerText = `Processing ${streamedData.length.toLocaleString()} records...`;
             
-            // Store the raw data for tooltips
-            window.sensorData = results.data;
+            // Store the raw data for tooltips (sampled version will be stored later)
+            window.sensorData = streamedData;
             
-            try {
-                console.log('Starting new parameter system...');
-                updateProgressText('Extracting parameter data...');
-                
-                // Extract all parameter data first
-                allParameterData = extractAllParameterData(results.data);
-                console.log('Parameter data extracted:', allParameterData);
-                
-                updateProgressText('Creating charts...');
-                
-                // Store original chart data for all parameters
-                originalChartData.magnetometer = createChartDataForParameter('magnetometer');
-                originalChartData.accelerometer = createChartDataForParameter('accelerometer');
-                originalChartData.altitude = createChartDataForParameter('altitude');
-                originalChartData.pressure = createChartDataForParameter('pressure');
-                originalChartData.temperature = createChartDataForParameter('temperature');
-                console.log('Chart data created for all parameters');
-                
-                // Create the charts with initial parameters
-                createParameterChart('magnetometerChart', 'magnetometer', 'chart1Title');
-                createParameterChart('accelerometerChart', 'accelerometer', 'chart2Title');
-                console.log('Parameter charts created');
-                
-                // Add event listeners for parameter selection dropdowns
-                setupParameterDropdowns();
-                console.log('Dropdown event listeners setup complete');
-            } catch (error) {
-                console.error('Error in new parameter system, falling back to original charts:', error);
-                // Fallback to original chart creation
-                createMagnetometerChart(results.data);
-                createAccelerometerChart(results.data);
+            // Initialize Web Worker for heavy processing
+            updateProgressText('Initializing data processor...');
+            
+            // Terminate existing worker if any
+            if (dataWorker) {
+                dataWorker.terminate();
             }
             
-            updateProgressText('Building 3D flight path...');
+            dataWorker = new Worker('js/dataProcessor.worker.js');
             
-            // Process 3D flight data
-            flightData = processData(results.data);
-            createFlightPath(flightData.positions, flightData.gpsData);
-            
-            updateProgressText('Creating geographic map...');
-            
-            // Create the geographic map
-            createMap(flightData.gpsData);
-            
-            // Set initial position
-            if (flightData.positions.length > 0) {
-                bird.position.copy(flightData.positions[0]);
-            }
-            
-            updateProgressText('Finalizing visualization...');
-            
-            // Hide loading message and processing overlay
-            document.getElementById('loading').style.display = 'none';
-            
-            setTimeout(() => {
-                processingOverlay.classList.remove('active');
+            // Handle worker messages
+            dataWorker.onmessage = function(e) {
+                const { type, progress, message, data: processedData, error } = e.data;
                 
-                // Start animation
-                animate();
-                
-                // Setup raycasting for tooltips
-                setupTooltipRaycasting();
-                
-                // Initialize maximize buttons after all content is loaded
-                initMaximizeButtons();
-            }, 500);
+                if (type === 'PROGRESS') {
+                    updateProgressText(`${message} (${progress}%)`);
+                } else if (type === 'COMPLETE') {
+                    console.log(`Processed ${processedData.gpsData.length} points (${e.data.originalSize} original rows)`);
+                    
+                    try {
+                        // Use processed data for charts and visualization
+                        updateProgressText('Building charts...');
+                        
+                        // Convert time labels back to Date objects
+                        const timeLabels = processedData.timeLabels.map(t => new Date(t));
+                        
+                        // Store in global allParameterData format
+                        allParameterData = {
+                            timeLabels: timeLabels,
+                            magnetometer: processedData.magnetometer,
+                            accelerometer: processedData.accelerometer,
+                            altitude: processedData.altitude,
+                            pressure: processedData.pressure,
+                            temperature: processedData.temperature
+                        };
+                        
+                        console.log('Parameter data extracted:', allParameterData);
+                        
+                        // Store original chart data for all parameters
+                        originalChartData.magnetometer = createChartDataForParameter('magnetometer');
+                        originalChartData.accelerometer = createChartDataForParameter('accelerometer');
+                        originalChartData.altitude = createChartDataForParameter('altitude');
+                        originalChartData.pressure = createChartDataForParameter('pressure');
+                        originalChartData.temperature = createChartDataForParameter('temperature');
+                        console.log('Chart data created for all parameters');
+                        
+                        // Create the charts with initial parameters
+                        createParameterChart('magnetometerChart', 'magnetometer', 'chart1Title');
+                        createParameterChart('accelerometerChart', 'accelerometer', 'chart2Title');
+                        console.log('Parameter charts created');
+                        
+                        // Add event listeners for parameter selection dropdowns
+                        setupParameterDropdowns();
+                        console.log('Dropdown event listeners setup complete');
+                        
+                        updateProgressText('Building 3D flight path...');
+                        
+                        // Process 3D flight data with optimized data
+                        flightData = processDataOptimized(processedData.gpsData, processedData.accelerometer, processedData.magnetometer);
+                        createFlightPath(flightData.positions, flightData.gpsData);
+                        
+                        updateProgressText('Creating geographic map...');
+                        
+                        // Create the geographic map
+                        createMap(flightData.gpsData);
+                        
+                        // Continue with visualization
+                        completeVisualization();
+                        
+                    } catch (error) {
+                        console.error('Error in visualization:', error);
+                        updateProgressText('Error creating visualization. Please try again.');
+                        setTimeout(() => {
+                            const processingOverlay = document.getElementById('processingOverlay');
+                            const welcomeScreen = document.getElementById('welcomeScreen');
+                            processingOverlay.classList.remove('active');
+                            welcomeScreen.classList.remove('hidden');
+                        }, 2000);
+                    }
+                    
+                    // Cleanup worker
+                    dataWorker.terminate();
+                    dataWorker = null;
+                    
+                } else if (type === 'ERROR') {
+                    console.error('Worker error:', error);
+                    updateProgressText('Error processing data. Please try again.');
+                    setTimeout(() => {
+                        const processingOverlay = document.getElementById('processingOverlay');
+                        const welcomeScreen = document.getElementById('welcomeScreen');
+                        processingOverlay.classList.remove('active');
+                        welcomeScreen.classList.remove('hidden');
+                    }, 2000);
+                    
+                    if (dataWorker) {
+                        dataWorker.terminate();
+                        dataWorker = null;
+                    }
+                }
+            };
+            
+            // Start processing with worker
+            dataWorker.postMessage({
+                type: 'PROCESS_CSV',
+                data: {
+                    csvData: streamedData,
+                    targetSize: targetSize
+                }
+            });
         },
         error: function(error) {
             console.error('Error parsing CSV:', error);
