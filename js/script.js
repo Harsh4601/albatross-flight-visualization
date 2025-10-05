@@ -7,7 +7,6 @@ let bird;
 
 // Function to initialize Three.js scene
 function initThreeJS() {
-    console.log('Initializing Three.js...');
     const containerElement = document.getElementById('container');
     
     if (!containerElement) {
@@ -15,72 +14,48 @@ function initThreeJS() {
         return false;
     }
     
-    // Clear container to ensure clean start
-    containerElement.innerHTML = '';
+    // Scene setup
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff); // White background
     
-    // Make sure previous Three.js objects are cleaned up
-    if (scene) {
-        console.log('Cleaning up existing scene before reinit');
-        scene = null;
-    }
-    if (renderer) {
-        console.log('Cleaning up existing renderer before reinit');
-        renderer.dispose();
-        renderer = null;
-    }
-    if (controls) {
-        controls.dispose();
-        controls = null;
-    }
+    // Camera setup - adjusted for 25% height layout (2x2 grid)
+    camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.5) / (window.innerHeight * 0.5), 0.1, 2000);
+    camera.position.set(50, 50, 50); // Increased position values for a more zoomed-out view
     
-    try {
-        // Scene setup
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xffffff); // White background
-        
-        // Camera setup - adjusted for 25% height layout (2x2 grid)
-        camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.5) / (window.innerHeight * 0.5), 0.1, 2000);
-        camera.position.set(50, 50, 50); // Increased position values for a more zoomed-out view
-        
-        // Renderer setup - adjusted for 25% height layout (2x2 grid)
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth * 0.5, window.innerHeight * 0.5);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        containerElement.appendChild(renderer.domElement);
-        
-        // Controls
-        controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.25;
-        
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-        
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(1, 1, 1);
-        scene.add(directionalLight);
-        
-        // Add grid for reference
-        const gridHelper = new THREE.GridHelper(200, 200, 0x888888, 0x444444);
-        gridHelper.position.y = -15;
-        gridHelper.material.opacity = 0.2;
-        gridHelper.material.transparent = true;
-        scene.add(gridHelper);
-        
-        // Create and add bird model
-        bird = createBirdModel();
-        scene.add(bird);
-        
-        // Create ocean
-        createOcean();
-        
-        console.log('Three.js initialized successfully');
-        return true;
-    } catch (error) {
-        console.error('Error initializing Three.js:', error);
-        return false;
-    }
+    // Renderer setup - adjusted for 25% height layout (2x2 grid)
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth * 0.5, window.innerHeight * 0.5);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    containerElement.appendChild(renderer.domElement);
+    
+    // Controls
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.25;
+    
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    scene.add(directionalLight);
+    
+    // Add grid for reference
+    const gridHelper = new THREE.GridHelper(200, 200, 0x888888, 0x444444);
+    gridHelper.position.y = -15;
+    gridHelper.material.opacity = 0.2;
+    gridHelper.material.transparent = true;
+    scene.add(gridHelper);
+    
+    // Create and add bird model
+    bird = createBirdModel();
+    scene.add(bird);
+    
+    // Create ocean
+    createOcean();
+    
+    return true;
 }
 
 // Create path material
@@ -509,29 +484,7 @@ function createGroundGrid(minX, maxX, minZ, maxZ) {
 
 // Function to create the geographic map
 function createMap(gpsData) {
-    if (!gpsData || gpsData.length === 0) {
-        console.error('No GPS data provided to createMap');
-        return;
-    }
-    
-    console.log('Creating map with', gpsData.length, 'GPS points');
-    
-    // Make sure map container exists
-    const mapContainer = document.getElementById('map');
-    if (!mapContainer) {
-        throw new Error('Map container not found');
-    }
-    
-    // If map already exists, remove it first
-    if (window.map) {
-        console.log('Removing existing map instance');
-        try {
-            window.map.remove();
-        } catch (e) {
-            console.warn('Error removing old map:', e);
-        }
-        window.map = null;
-    }
+    if (!gpsData || gpsData.length === 0) return;
     
     // Calculate center and bounds of the flight path
     let minLat = Infinity, maxLat = -Infinity;
@@ -547,16 +500,8 @@ function createMap(gpsData) {
     const centerLat = (minLat + maxLat) / 2;
     const centerLon = (minLon + maxLon) / 2;
     
-    console.log('Map center:', centerLat, centerLon);
-    
     // Initialize map
-    try {
-        map = L.map('map').setView([centerLat, centerLon], 10);
-        console.log('Map created successfully');
-    } catch (error) {
-        console.error('Error creating Leaflet map:', error);
-        throw error;
-    }
+    map = L.map('map').setView([centerLat, centerLon], 10);
     
     // Add OpenStreetMap tile layer (free)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1113,301 +1058,6 @@ function globalReset() {
     }
     
     console.log("Global reset completed");
-}
-
-// Floating Menu Functions
-function toggleFloatingMenu() {
-    const floatingMenu = document.getElementById('floatingMenu');
-    const menuBackdrop = document.getElementById('menuBackdrop');
-    
-    if (floatingMenu && menuBackdrop) {
-        const isVisible = floatingMenu.classList.contains('show');
-        
-        if (isVisible) {
-            closeFloatingMenu();
-        } else {
-            openFloatingMenu();
-        }
-    }
-}
-
-function openFloatingMenu() {
-    const floatingMenu = document.getElementById('floatingMenu');
-    const menuBackdrop = document.getElementById('menuBackdrop');
-    
-    if (floatingMenu) {
-        floatingMenu.classList.remove('hidden');
-        floatingMenu.classList.add('show');
-    }
-    
-    if (menuBackdrop) {
-        menuBackdrop.classList.remove('hidden');
-        menuBackdrop.classList.add('show');
-    }
-}
-
-function closeFloatingMenu() {
-    const floatingMenu = document.getElementById('floatingMenu');
-    const menuBackdrop = document.getElementById('menuBackdrop');
-    
-    if (floatingMenu) {
-        floatingMenu.classList.remove('show');
-        setTimeout(() => {
-            floatingMenu.classList.add('hidden');
-        }, 300);
-    }
-    
-    if (menuBackdrop) {
-        menuBackdrop.classList.remove('show');
-        setTimeout(() => {
-            menuBackdrop.classList.add('hidden');
-        }, 300);
-    }
-}
-
-// Function to return to upload screen (for Upload New CSV button)
-function returnToUploadScreen() {
-    console.log("Returning to upload screen...");
-    
-    // Hide main container
-    const mainContainer = document.getElementById('mainContainer');
-    if (mainContainer) {
-        mainContainer.classList.add('hidden');
-    }
-    
-    // Hide floating menu button and close menu
-    const floatingMenuBtn = document.getElementById('floatingMenuBtn');
-    const floatingMenu = document.getElementById('floatingMenu');
-    const menuBackdrop = document.getElementById('menuBackdrop');
-    
-    if (floatingMenuBtn) {
-        floatingMenuBtn.classList.add('hidden');
-    }
-    if (floatingMenu) {
-        floatingMenu.classList.remove('show');
-        floatingMenu.classList.add('hidden');
-    }
-    if (menuBackdrop) {
-        menuBackdrop.classList.remove('show');
-        menuBackdrop.classList.add('hidden');
-    }
-    
-    // Show welcome screen
-    const welcomeScreen = document.getElementById('welcomeScreen');
-    if (welcomeScreen) {
-        welcomeScreen.classList.remove('hidden');
-    }
-    
-    // Reset file input
-    const fileInput = document.getElementById('csvFileInput');
-    const fileInfo = document.getElementById('fileInfo');
-    if (fileInput) {
-        fileInput.value = '';
-    }
-    if (fileInfo) {
-        fileInfo.textContent = 'No file selected';
-    }
-    
-    // Stop animation loop
-    if (typeof animationFrameId !== 'undefined' && animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-    
-    // Clean up Three.js scene if it exists
-    if (scene) {
-        // Remove all objects from scene
-        while(scene.children.length > 0) {
-            const object = scene.children[0];
-            if (object.geometry) object.geometry.dispose();
-            if (object.material) {
-                if (Array.isArray(object.material)) {
-                    object.material.forEach(material => material.dispose());
-                } else {
-                    object.material.dispose();
-                }
-            }
-            scene.remove(object);
-        }
-        scene = null;
-    }
-    
-    // Clean up renderer
-    if (renderer) {
-        if (renderer.domElement && renderer.domElement.parentNode) {
-            renderer.domElement.parentNode.removeChild(renderer.domElement);
-        }
-        renderer.dispose();
-        renderer = null;
-    }
-    
-    // Reset Three.js variables
-    camera = null;
-    controls = null;
-    bird = null;
-    
-    // Clean up map
-    if (window.map) {
-        console.log('Cleaning up existing map');
-        try {
-            window.map.remove();
-        } catch (e) {
-            console.warn('Error removing map during cleanup:', e);
-        }
-        window.map = null;
-    }
-    if (typeof map !== 'undefined' && map !== null) {
-        try {
-            map.remove();
-        } catch (e) {
-            console.warn('Error removing global map during cleanup:', e);
-        }
-        map = null;
-    }
-    
-    // Clean up charts
-    if (window.chart1Instance) {
-        window.chart1Instance.destroy();
-        window.chart1Instance = null;
-    }
-    if (window.chart2Instance) {
-        window.chart2Instance.destroy();
-        window.chart2Instance = null;
-    }
-    
-    // Clear canvas elements to ensure fresh start
-    const magnetometerCanvas = document.getElementById('magnetometerChart');
-    const accelerometerCanvas = document.getElementById('accelerometerChart');
-    if (magnetometerCanvas) {
-        const ctx = magnetometerCanvas.getContext('2d');
-        if (ctx) {
-            ctx.clearRect(0, 0, magnetometerCanvas.width, magnetometerCanvas.height);
-        }
-    }
-    if (accelerometerCanvas) {
-        const ctx = accelerometerCanvas.getContext('2d');
-        if (ctx) {
-            ctx.clearRect(0, 0, accelerometerCanvas.width, accelerometerCanvas.height);
-        }
-    }
-    
-    // DON'T clear map container HTML - Leaflet needs the div element
-    // The map instance was already removed above with map.remove()
-    
-    // DON'T clear 3D container HTML yet - will be cleared in initThreeJS
-    // The renderer was already cleaned up above
-    
-    // Clear global data
-    window.sensorData = null;
-    window.flightData = null;
-    window.allParameterData = null;
-    window.originalChartData = null;
-    window.pathSegments = null;
-    window.currentGpsData = null;
-    
-    // Reset global variables at module level
-    if (typeof flightData !== 'undefined') {
-        flightData = [];
-    }
-    if (typeof allParameterData !== 'undefined') {
-        allParameterData = {
-            timeLabels: [],
-            magnetometer: { mx: [], my: [], mz: [] },
-            accelerometer: { ax: [], ay: [], az: [] },
-            altitude: [],
-            pressure: [],
-            temperature: []
-        };
-    }
-    if (typeof originalChartData !== 'undefined') {
-        originalChartData = {
-            magnetometer: null,
-            accelerometer: null,
-            altitude: null,
-            pressure: null,
-            temperature: null
-        };
-    }
-    
-    // Reset map-related variables
-    if (typeof flightPathLayer !== 'undefined' && flightPathLayer !== null) {
-        try {
-            flightPathLayer.clearLayers();
-        } catch (e) {
-            console.warn('Error clearing flight path layer:', e);
-        }
-        flightPathLayer = null;
-    }
-    if (typeof markersLayer !== 'undefined' && markersLayer !== null) {
-        try {
-            markersLayer.clearLayers();
-        } catch (e) {
-            console.warn('Error clearing markers layer:', e);
-        }
-        markersLayer = null;
-    }
-    if (typeof mapHighlightLayer !== 'undefined' && mapHighlightLayer !== null) {
-        try {
-            mapHighlightLayer.clearLayers();
-        } catch (e) {
-            console.warn('Error clearing highlight layer:', e);
-        }
-        mapHighlightLayer = null;
-    }
-    
-    // Reset chart selection variables
-    if (typeof selectedTimeRange !== 'undefined') {
-        selectedTimeRange = null;
-    }
-    if (typeof isSelectingTime !== 'undefined') {
-        isSelectingTime = false;
-    }
-    
-    // Reset segment variables
-    if (typeof currentSegmentIndex !== 'undefined') {
-        currentSegmentIndex = 0;
-    }
-    if (typeof pathPercentage !== 'undefined') {
-        pathPercentage = 0;
-    }
-    if (typeof originalSegmentMaterials !== 'undefined') {
-        originalSegmentMaterials = [];
-    }
-    
-    // Reset hover line variables
-    if (typeof magnetometerHoverLine !== 'undefined') {
-        magnetometerHoverLine = null;
-    }
-    if (typeof accelerometerHoverLine !== 'undefined') {
-        accelerometerHoverLine = null;
-    }
-    
-    // Reset parameter boundaries
-    if (typeof parameterBoundaries !== 'undefined') {
-        parameterBoundaries = {
-            altitude: { min: 0, max: 100 },
-            pressure: { min: 980, max: 1020 },
-            temperature: { min: -10, max: 30 }
-        };
-    }
-    if (typeof currentColorParameter !== 'undefined') {
-        currentColorParameter = 'altitude';
-    }
-    
-    // Cancel any ongoing Web Worker
-    if (dataWorker) {
-        dataWorker.terminate();
-        dataWorker = null;
-    }
-    
-    // Reset loading display
-    const loadingDiv = document.getElementById('loading');
-    if (loadingDiv) {
-        loadingDiv.style.display = 'block';
-        loadingDiv.innerText = 'Loading flight data...';
-    }
-    
-    console.log("Returned to upload screen, all state cleared, ready for new CSV");
 }
 
 // Function to extract all parameter data from CSV
@@ -3258,23 +2908,13 @@ function processUploadedCSV(file) {
                         
                     } catch (error) {
                         console.error('Error in visualization:', error);
-                        console.error('Error stack:', error.stack);
-                        console.error('Error details - Name:', error.name, 'Message:', error.message);
-                        updateProgressText('Error creating visualization: ' + error.message);
-                        
-                        // Clean up and hide processing overlay immediately
-                        const processingOverlay = document.getElementById('processingOverlay');
-                        if (processingOverlay) {
-                            processingOverlay.classList.remove('active');
-                        }
-                        
-                        // Don't automatically return to welcome screen - let user see the error
-                        alert('Error creating visualization: ' + error.message + '\n\nPlease check the browser console for details and try uploading again.');
-                        
-                        // Now return to welcome screen
+                        updateProgressText('Error creating visualization. Please try again.');
                         setTimeout(() => {
-                            returnToUploadScreen();
-                        }, 500);
+                            const processingOverlay = document.getElementById('processingOverlay');
+                            const welcomeScreen = document.getElementById('welcomeScreen');
+                            processingOverlay.classList.remove('active');
+                            welcomeScreen.classList.remove('hidden');
+                        }, 2000);
                     }
                     
                     // Cleanup worker
@@ -3283,28 +2923,18 @@ function processUploadedCSV(file) {
                     
                 } else if (type === 'ERROR') {
                     console.error('Worker error:', error);
-                    console.error('Worker error details:', e.data);
-                    updateProgressText('Error processing data: ' + error);
-                    
-                    // Clean up processing overlay
-                    const processingOverlay = document.getElementById('processingOverlay');
-                    if (processingOverlay) {
+                    updateProgressText('Error processing data. Please try again.');
+                    setTimeout(() => {
+                        const processingOverlay = document.getElementById('processingOverlay');
+                        const welcomeScreen = document.getElementById('welcomeScreen');
                         processingOverlay.classList.remove('active');
-                    }
+                        welcomeScreen.classList.remove('hidden');
+                    }, 2000);
                     
-                    // Show error to user
-                    alert('Error processing data: ' + error + '\n\nPlease try uploading again or check the browser console for details.');
-                    
-                    // Clean up worker
                     if (dataWorker) {
                         dataWorker.terminate();
                         dataWorker = null;
                     }
-                    
-                    // Return to upload screen
-                    setTimeout(() => {
-                        returnToUploadScreen();
-                    }, 500);
                 }
             };
             
@@ -3910,18 +3540,13 @@ function createFlightPath(positions, gpsData = null) {
 // Variables for navigation
 let currentSegmentIndex = 0; // Track the current segment
 let pathPercentage = 0; // Track the current position percentage
-let animationFrameId = null; // Track animation frame for cleanup
 
 // Animation loop
 function animate() {
-    animationFrameId = requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
     
     // Safety checks
     if (!renderer || !scene || !camera || !controls) {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-        }
         return;
     }
     
@@ -3979,17 +3604,6 @@ window.addEventListener('resize', () => {
 });
 
 // Initialize path segment navigation
-// Store event listener references to allow cleanup
-let navEventListeners = {
-    prevSegment: null,
-    nextSegment: null,
-    floatingMenuBtn: null,
-    closeMenuBtn: null,
-    menuBackdrop: null,
-    menuUploadBtn: null,
-    menuResetBtn: null
-};
-
 function initPathNavigation() {
     const segmentButtonsContainer = document.getElementById('segmentButtons');
     const pathSegments = window.pathSegments;
@@ -3997,90 +3611,30 @@ function initPathNavigation() {
     // Clear existing buttons
     segmentButtonsContainer.innerHTML = '';
     
-    // Remove old event listeners before adding new ones
-    const prevBtn = document.getElementById('prevSegment');
-    const nextBtn = document.getElementById('nextSegment');
+    // Don't create numbered segment buttons
     
-    if (prevBtn && navEventListeners.prevSegment) {
-        prevBtn.removeEventListener('click', navEventListeners.prevSegment);
-    }
-    if (nextBtn && navEventListeners.nextSegment) {
-        nextBtn.removeEventListener('click', navEventListeners.nextSegment);
-    }
-    
-    // Set up next/prev buttons with new listeners
-    navEventListeners.prevSegment = () => {
+    // Set up next/prev buttons
+    document.getElementById('prevSegment').addEventListener('click', () => {
         currentSegmentIndex = (currentSegmentIndex - 1 + pathSegments.length) % pathSegments.length;
         focusOnSegment(currentSegmentIndex);
-    };
-    navEventListeners.nextSegment = () => {
+    });
+    
+    document.getElementById('nextSegment').addEventListener('click', () => {
         currentSegmentIndex = (currentSegmentIndex + 1) % pathSegments.length;
         focusOnSegment(currentSegmentIndex);
-    };
+    });
     
-    if (prevBtn) prevBtn.addEventListener('click', navEventListeners.prevSegment);
-    if (nextBtn) nextBtn.addEventListener('click', navEventListeners.nextSegment);
-    
-    // Set up floating menu - only if not already set up
-    const floatingMenuBtn = document.getElementById('floatingMenuBtn');
-    const floatingMenu = document.getElementById('floatingMenu');
-    const menuBackdrop = document.getElementById('menuBackdrop');
-    const closeMenuBtn = document.getElementById('closeMenuBtn');
-    const menuUploadBtn = document.getElementById('menuUploadBtn');
-    const menuResetBtn = document.getElementById('menuResetBtn');
-    
-    // Remove old listeners
-    if (floatingMenuBtn && navEventListeners.floatingMenuBtn) {
-        floatingMenuBtn.removeEventListener('click', navEventListeners.floatingMenuBtn);
+    // Set up global reset button
+    const globalResetBtn = document.getElementById('globalResetBtn');
+    if (globalResetBtn) {
+        globalResetBtn.classList.remove('hidden');
+        globalResetBtn.addEventListener('click', () => {
+            globalReset();
+        });
     }
-    if (closeMenuBtn && navEventListeners.closeMenuBtn) {
-        closeMenuBtn.removeEventListener('click', navEventListeners.closeMenuBtn);
-    }
-    if (menuBackdrop && navEventListeners.menuBackdrop) {
-        menuBackdrop.removeEventListener('click', navEventListeners.menuBackdrop);
-    }
-    if (menuUploadBtn && navEventListeners.menuUploadBtn) {
-        menuUploadBtn.removeEventListener('click', navEventListeners.menuUploadBtn);
-    }
-    if (menuResetBtn && navEventListeners.menuResetBtn) {
-        menuResetBtn.removeEventListener('click', navEventListeners.menuResetBtn);
-    }
-    
-    // Create new listeners
-    navEventListeners.floatingMenuBtn = () => toggleFloatingMenu();
-    navEventListeners.closeMenuBtn = () => closeFloatingMenu();
-    navEventListeners.menuBackdrop = () => closeFloatingMenu();
-    navEventListeners.menuUploadBtn = () => {
-        closeFloatingMenu();
-        setTimeout(() => returnToUploadScreen(), 200);
-    };
-    navEventListeners.menuResetBtn = () => {
-        closeFloatingMenu();
-        setTimeout(() => globalReset(), 200);
-    };
-    
-    // Attach new listeners
-    if (floatingMenuBtn) {
-        floatingMenuBtn.classList.remove('hidden');
-        floatingMenuBtn.addEventListener('click', navEventListeners.floatingMenuBtn);
-    }
-    if (closeMenuBtn) {
-        closeMenuBtn.addEventListener('click', navEventListeners.closeMenuBtn);
-    }
-    if (menuBackdrop) {
-        menuBackdrop.addEventListener('click', navEventListeners.menuBackdrop);
-    }
-    if (menuUploadBtn) {
-        menuUploadBtn.addEventListener('click', navEventListeners.menuUploadBtn);
-    }
-    if (menuResetBtn) {
-        menuResetBtn.addEventListener('click', navEventListeners.menuResetBtn);
-    }
-    
-    console.log('Path navigation initialized');
     
     // Initialize with the first segment
-    if (pathSegments && pathSegments.length > 0) {
+    if (pathSegments.length > 0) {
         focusOnSegment(0);
     }
 }
