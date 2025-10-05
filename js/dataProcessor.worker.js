@@ -1,27 +1,8 @@
 // Web Worker for processing large CSV files
 // This offloads heavy computation from the main thread
 
-self.importScripts('https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js');
-
-// Intelligently sample data based on size
-function sampleData(data, targetSize = 10000) {
-    if (data.length <= targetSize) {
-        return data; // No sampling needed
-    }
-    
-    const sampled = [];
-    const step = data.length / targetSize;
-    
-    for (let i = 0; i < data.length; i += step) {
-        const index = Math.floor(i);
-        if (index < data.length) {
-            sampled.push(data[index]);
-        }
-    }
-    
-    console.log(`Sampled ${sampled.length} points from ${data.length} total points`);
-    return sampled;
-}
+// Note: PapaParse is not needed here as CSV parsing is done in the main thread
+// The worker receives already-parsed data objects
 
 // Calculate altitude from pressure
 function pressureToAltitude(pressure, seaLevelPressure) {
@@ -122,7 +103,7 @@ self.addEventListener('message', function(e) {
     const { type, data } = e.data;
     
     if (type === 'PROCESS_CSV') {
-        const { csvData, targetSize } = data;
+        const { csvData } = data;
         
         try {
             // Step 1: Find max pressure for altitude calculation
@@ -136,31 +117,27 @@ self.addEventListener('message', function(e) {
                 }
             }
             
-            // Step 2: Sample data if necessary
-            self.postMessage({ type: 'PROGRESS', progress: 20, message: 'Sampling data...' });
-            const sampledData = sampleData(csvData, targetSize);
+            // Step 2: Process all data in chunks to allow progress updates
+            self.postMessage({ type: 'PROGRESS', progress: 20, message: `Processing all ${csvData.length} records...` });
             
-            // Step 3: Process in chunks to allow progress updates
-            self.postMessage({ type: 'PROGRESS', progress: 30, message: 'Processing data...' });
-            
-            const chunkSize = 1000;
+            const chunkSize = 5000; // Process in larger chunks for efficiency
             const chunks = [];
             
-            for (let i = 0; i < sampledData.length; i += chunkSize) {
-                const chunk = sampledData.slice(i, Math.min(i + chunkSize, sampledData.length));
+            for (let i = 0; i < csvData.length; i += chunkSize) {
+                const chunk = csvData.slice(i, Math.min(i + chunkSize, csvData.length));
                 const processed = processDataChunk(chunk, maxPressure);
                 chunks.push(processed);
                 
                 // Update progress
-                const progress = 30 + (i / sampledData.length) * 60;
+                const progress = 20 + (i / csvData.length) * 70;
                 self.postMessage({ 
                     type: 'PROGRESS', 
                     progress: Math.floor(progress),
-                    message: `Processing ${i + chunk.length} of ${sampledData.length} records...`
+                    message: `Processing ${Math.min(i + chunkSize, csvData.length)} of ${csvData.length} records...`
                 });
             }
             
-            // Step 4: Merge chunks
+            // Step 3: Merge chunks
             self.postMessage({ type: 'PROGRESS', progress: 95, message: 'Finalizing data...' });
             const result = mergeChunks(chunks);
             
@@ -168,8 +145,7 @@ self.addEventListener('message', function(e) {
             self.postMessage({ 
                 type: 'COMPLETE', 
                 data: result,
-                originalSize: csvData.length,
-                processedSize: sampledData.length
+                totalRecords: csvData.length
             });
             
         } catch (error) {

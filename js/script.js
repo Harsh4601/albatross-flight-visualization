@@ -486,6 +486,10 @@ function createGroundGrid(minX, maxX, minZ, maxZ) {
 function createMap(gpsData) {
     if (!gpsData || gpsData.length === 0) return;
     
+    // Store GPS data globally for time selection and highlighting
+    window.currentGpsData = gpsData;
+    console.log(`Stored ${gpsData.length} GPS data points for map interaction`);
+    
     // Calculate center and bounds of the flight path
     let minLat = Infinity, maxLat = -Infinity;
     let minLon = Infinity, maxLon = -Infinity;
@@ -511,7 +515,15 @@ function createMap(gpsData) {
     
     // Create layer groups
     flightPathLayer = L.layerGroup().addTo(map);
-    markersLayer = L.layerGroup().addTo(map);
+    // Use MarkerCluster for efficient marker rendering with many data points
+    markersLayer = L.markerClusterGroup({
+        maxClusterRadius: 50,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 15 // Show individual markers when zoomed in
+    });
+    map.addLayer(markersLayer);
     mapHighlightLayer = L.layerGroup().addTo(map); // Layer for highlighting selected segments
     
     // Add flight path
@@ -529,9 +541,13 @@ function createMap(gpsData) {
 function createMapFlightPath(gpsData) {
     if (!gpsData || gpsData.length === 0) return;
     
-    // Sample points for performance (every 10th point)
-    const sampleInterval = Math.max(1, Math.floor(gpsData.length / 1000));
+    // Intelligent sampling: Keep more detail, Leaflet can handle it efficiently
+    // Target: ~2000-5000 segments for smooth path while maintaining detail
+    const targetSegments = 3000;
+    const sampleInterval = Math.max(1, Math.floor(gpsData.length / targetSegments));
     const sampledData = gpsData.filter((_, index) => index % sampleInterval === 0);
+    
+    console.log(`Creating map path with ${sampledData.length} segments from ${gpsData.length} total points`);
     
     // Create path segments with altitude-based colors
     for (let i = 0; i < sampledData.length - 1; i++) {
@@ -776,6 +792,30 @@ function createMapMarkers(gpsData) {
         `);
         markersLayer.addLayer(lowMarker);
     }
+    
+    // Add intermediate markers (will be clustered automatically)
+    // Sample intelligently based on data size - target 100-200 markers
+    const markerInterval = Math.max(10, Math.floor(gpsData.length / 150));
+    console.log(`Adding intermediate markers every ${markerInterval} points (${Math.floor(gpsData.length / markerInterval)} markers total)`);
+    
+    for (let i = markerInterval; i < gpsData.length - 1; i += markerInterval) {
+        const point = gpsData[i];
+        const marker = L.circleMarker([point.lat, point.lon], {
+            radius: 4,
+            fillColor: getParameterColor(point.altitude, 'altitude'),
+            color: '#fff',
+            weight: 1,
+            opacity: 0.8,
+            fillOpacity: 0.6
+        }).bindPopup(`
+            <strong>Data Point #${i}</strong><br>
+            Coordinates: ${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}<br>
+            Altitude: ${point.altitude.toFixed(1)}m<br>
+            Pressure: ${point.pressure.toFixed(1)} hPa<br>
+            Temperature: ${point.temperature.toFixed(1)}°C
+        `);
+        markersLayer.addLayer(marker);
+    }
 }
 
 // Chart variables
@@ -821,13 +861,19 @@ function onTimeRangeSelected(startIndex, endIndex, sourceChart) {
     // Focus camera on corresponding 3D path segment
     focusCameraOnTimeRange(startIndex, endIndex);
     
-    // Calculate GPS data indices for map highlighting
-    if (flightData && flightData.positions && originalChartData.magnetometer) {
-        const totalDataPoints = flightData.positions.length;
-        const actualStartIndex = Math.floor((startIndex / originalChartData.magnetometer.timeLabels.length) * totalDataPoints);
-        const actualEndIndex = Math.min(Math.floor((endIndex / originalChartData.magnetometer.timeLabels.length) * totalDataPoints), totalDataPoints - 1);
+    // Calculate GPS data indices for map highlighting and zooming
+    if (window.currentGpsData && originalChartData.magnetometer) {
+        const totalChartPoints = originalChartData.magnetometer.timeLabels.length;
+        const totalGpsPoints = window.currentGpsData.length;
         
-        // Highlight the corresponding segment on the map with GPS indices
+        // Map chart indices to GPS data indices
+        const actualStartIndex = Math.floor((startIndex / totalChartPoints) * totalGpsPoints);
+        const actualEndIndex = Math.min(Math.floor((endIndex / totalChartPoints) * totalGpsPoints), totalGpsPoints - 1);
+        
+        console.log(`Mapping chart range [${startIndex}, ${endIndex}] to GPS range [${actualStartIndex}, ${actualEndIndex}]`);
+        console.log(`Chart has ${totalChartPoints} points, GPS has ${totalGpsPoints} points`);
+        
+        // Highlight and zoom to the corresponding segment on the map
         highlightMapTimeRange(actualStartIndex, actualEndIndex);
     }
 }
@@ -1166,21 +1212,21 @@ function createChartDataForParameter(parameter) {
                 timeLabels: data.timeLabels,
                 datasets: [{
                     label: 'Mx (μT)',
-                    data: data.magnetometer.mx,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.magnetometer.mx[i] })),
                     borderColor: 'rgb(255, 99, 132)',
                     backgroundColor: 'rgba(255, 99, 132, 0.1)',
                     borderWidth: 1,
                     pointRadius: 0
                 }, {
                     label: 'My (μT)',
-                    data: data.magnetometer.my,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.magnetometer.my[i] })),
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.1)',
                     borderWidth: 1,
                     pointRadius: 0
                 }, {
                     label: 'Mz (μT)',
-                    data: data.magnetometer.mz,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.magnetometer.mz[i] })),
                     borderColor: 'rgb(75, 192, 192)',
                     backgroundColor: 'rgba(75, 192, 192, 0.1)',
                     borderWidth: 1,
@@ -1193,21 +1239,21 @@ function createChartDataForParameter(parameter) {
                 timeLabels: data.timeLabels,
                 datasets: [{
                     label: 'Ax (g)',
-                    data: data.accelerometer.ax,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.accelerometer.ax[i] })),
                     borderColor: 'rgb(255, 159, 64)',
                     backgroundColor: 'rgba(255, 159, 64, 0.1)',
                     borderWidth: 1,
                     pointRadius: 0
                 }, {
                     label: 'Ay (g)',
-                    data: data.accelerometer.ay,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.accelerometer.ay[i] })),
                     borderColor: 'rgb(153, 102, 255)',
                     backgroundColor: 'rgba(153, 102, 255, 0.1)',
                     borderWidth: 1,
                     pointRadius: 0
                 }, {
                     label: 'Az (g)',
-                    data: data.accelerometer.az,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.accelerometer.az[i] })),
                     borderColor: 'rgb(255, 205, 86)',
                     backgroundColor: 'rgba(255, 205, 86, 0.1)',
                     borderWidth: 1,
@@ -1220,7 +1266,7 @@ function createChartDataForParameter(parameter) {
                 timeLabels: data.timeLabels,
                 datasets: [{
                     label: 'Altitude (m)',
-                    data: data.altitude,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.altitude[i] })),
                     borderColor: 'rgb(0, 102, 204)',
                     backgroundColor: 'rgba(0, 102, 204, 0.1)',
                     borderWidth: 2,
@@ -1233,7 +1279,7 @@ function createChartDataForParameter(parameter) {
                 timeLabels: data.timeLabels,
                 datasets: [{
                     label: 'Pressure (hPa)',
-                    data: data.pressure,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.pressure[i] })),
                     borderColor: 'rgb(142, 68, 173)',
                     backgroundColor: 'rgba(142, 68, 173, 0.1)',
                     borderWidth: 2,
@@ -1246,7 +1292,7 @@ function createChartDataForParameter(parameter) {
                 timeLabels: data.timeLabels,
                 datasets: [{
                     label: 'Temperature (°C)',
-                    data: data.temperature,
+                    data: data.timeLabels.map((time, i) => ({ x: time, y: data.temperature[i] })),
                     borderColor: 'rgb(255, 102, 0)',
                     backgroundColor: 'rgba(255, 102, 0, 0.1)',
                     borderWidth: 2,
@@ -1467,11 +1513,21 @@ function createParameterChart(canvasId, parameter, titleId) {
             },
             elements: {
                 point: {
-                    hoverRadius: 0
+                    hoverRadius: 0,
+                    radius: 0 // Don't show points by default for better performance
                 },
                 line: {
-                    tension: 0
+                    tension: 0,
+                    borderWidth: 1.5
                 }
+            },
+            spanGaps: false,
+            // Decimation: intelligently downsample for display while keeping all data
+            decimation: {
+                enabled: true,
+                algorithm: 'lttb', // Largest Triangle Three Buckets - best visual preservation
+                samples: 1000, // Show up to 1000 points on screen for good detail
+                threshold: 2000 // Only apply decimation if more than 2000 points
             }
         }
     });
@@ -2690,29 +2746,134 @@ function updateProgressText(text) {
 let dataWorker = null;
 
 // Optimized data processing function that works with pre-processed data
+// Smart downsampling for 3D visualization using LTTB algorithm
+function downsample3DData(data, targetSize) {
+    if (data.length <= targetSize) return data;
+    
+    // Use Largest Triangle Three Buckets (LTTB) algorithm for intelligent downsampling
+    const sampled = [data[0]]; // Always keep first point
+    const bucketSize = (data.length - 2) / (targetSize - 2);
+    
+    let a = 0; // Previous selected point
+    
+    for (let i = 0; i < targetSize - 2; i++) {
+        const avgRangeStart = Math.floor((i + 1) * bucketSize) + 1;
+        const avgRangeEnd = Math.floor((i + 2) * bucketSize) + 1;
+        const avgRangeEndClamped = Math.min(avgRangeEnd, data.length);
+        
+        // Calculate average point in next bucket
+        let avgX = 0, avgY = 0, avgZ = 0;
+        let avgRangeLength = avgRangeEndClamped - avgRangeStart;
+        
+        for (let j = avgRangeStart; j < avgRangeEndClamped; j++) {
+            avgX += (data[j].lon || data[j].x || 0);
+            avgY += (data[j].lat || data[j].y || 0);
+            avgZ += (data[j].altitude || data[j].z || 0);
+        }
+        avgX /= avgRangeLength;
+        avgY /= avgRangeLength;
+        avgZ /= avgRangeLength;
+        
+        // Find point in current bucket with largest triangle area
+        const rangeStart = Math.floor(i * bucketSize) + 1;
+        const rangeEnd = Math.floor((i + 1) * bucketSize) + 1;
+        
+        let maxArea = -1;
+        let maxAreaIndex = rangeStart;
+        
+        const pointA = data[a];
+        const pointAX = pointA.lon || pointA.x || 0;
+        const pointAY = pointA.lat || pointA.y || 0;
+        const pointAZ = pointA.altitude || pointA.z || 0;
+        
+        for (let j = rangeStart; j < rangeEnd; j++) {
+            const pointB = data[j];
+            const pointBX = pointB.lon || pointB.x || 0;
+            const pointBY = pointB.lat || pointB.y || 0;
+            const pointBZ = pointB.altitude || pointB.z || 0;
+            
+            // Calculate area of triangle (simplified for 3D)
+            const area = Math.abs(
+                (pointAX - avgX) * (pointBY - pointAY) -
+                (pointAX - pointBX) * (avgY - pointAY) +
+                (pointAZ - avgZ) * (pointBZ - pointAZ)
+            );
+            
+            if (area > maxArea) {
+                maxArea = area;
+                maxAreaIndex = j;
+            }
+        }
+        
+        sampled.push(data[maxAreaIndex]);
+        a = maxAreaIndex;
+    }
+    
+    sampled.push(data[data.length - 1]); // Always keep last point
+    console.log(`3D Downsampled: ${data.length} → ${sampled.length} points using LTTB algorithm`);
+    return sampled;
+}
+
 function processDataOptimized(gpsData, accelerometerData, magnetometerData) {
-    console.log(`Processing ${gpsData.length} optimized data points`);
+    console.log(`Processing ${gpsData.length} data points for 3D visualization`);
+    
+    // Intelligently downsample for 3D rendering if needed (target: 10k-20k points)
+    // The eye can't distinguish more than ~20k points in 3D anyway
+    const target3DPoints = 15000;
+    const sampled3DData = gpsData.length > target3DPoints ? 
+        downsample3DData(gpsData, target3DPoints) : gpsData;
+    
+    if (sampled3DData.length < gpsData.length) {
+        console.log(`Using ${sampled3DData.length} points for 3D rendering (from ${gpsData.length} total)`);
+    }
+    
+    // Downsample accelerometer and magnetometer data proportionally
+    const downsampleRatio = sampled3DData.length / gpsData.length;
+    const sampleIndices = [];
+    
+    if (downsampleRatio < 1) {
+        const step = gpsData.length / sampled3DData.length;
+        for (let i = 0; i < sampled3DData.length; i++) {
+            sampleIndices.push(Math.floor(i * step));
+        }
+    } else {
+        for (let i = 0; i < gpsData.length; i++) {
+            sampleIndices.push(i);
+        }
+    }
+    
+    const sampledAccel = {
+        ax: sampleIndices.map(i => accelerometerData.ax[i]),
+        ay: sampleIndices.map(i => accelerometerData.ay[i]),
+        az: sampleIndices.map(i => accelerometerData.az[i])
+    };
+    
+    const sampledMag = {
+        mx: sampleIndices.map(i => magnetometerData.mx[i]),
+        my: sampleIndices.map(i => magnetometerData.my[i]),
+        mz: sampleIndices.map(i => magnetometerData.mz[i])
+    };
     
     // Get GPS-based positions
-    const gpsPositions = convertGpsTo3D(gpsData);
+    const gpsPositions = convertGpsTo3D(sampled3DData);
     
-    // Convert accelerometer data to required format
+    // Convert accelerometer data to required format (use sampled data)
     const accelData = [];
-    for (let i = 0; i < accelerometerData.ax.length; i++) {
+    for (let i = 0; i < sampledAccel.ax.length; i++) {
         accelData.push({
-            x: accelerometerData.ax[i],
-            y: accelerometerData.ay[i],
-            z: accelerometerData.az[i]
+            x: sampledAccel.ax[i],
+            y: sampledAccel.ay[i],
+            z: sampledAccel.az[i]
         });
     }
     
-    // Convert magnetometer data to required format
+    // Convert magnetometer data to required format (use sampled data)
     const magData = [];
-    for (let i = 0; i < magnetometerData.mx.length; i++) {
+    for (let i = 0; i < sampledMag.mx.length; i++) {
         magData.push({
-            x: magnetometerData.mx[i],
-            y: magnetometerData.my[i],
-            z: magnetometerData.mz[i]
+            x: sampledMag.mx[i],
+            y: sampledMag.my[i],
+            z: sampledMag.mz[i]
         });
     }
     
@@ -2729,7 +2890,7 @@ function processDataOptimized(gpsData, accelerometerData, magnetometerData) {
     // Calculate orientations based on path and magnetometer data
     const orientations = calculateOrientation(positions, magData);
     
-    // Calculate parameter boundaries for all parameters and update color legend
+    // Calculate parameter boundaries for all parameters and update color legend (use full GPS data)
     calculateParameterBoundaries(gpsData);
     updateColorLegend(gpsData);
     
@@ -2739,7 +2900,7 @@ function processDataOptimized(gpsData, accelerometerData, magnetometerData) {
     return {
         positions: positions,
         orientations: orientations,
-        gpsData: gpsData
+        gpsData: sampled3DData // Use sampled data for 3D rendering
     };
 }
 
@@ -2760,6 +2921,9 @@ function completeVisualization() {
     setTimeout(() => {
         processingOverlay.classList.remove('active');
         
+        // Show data statistics banner
+        showDataStatistics();
+        
         // Start animation
         animate();
         
@@ -2768,7 +2932,37 @@ function completeVisualization() {
         
         // Initialize maximize buttons after all content is loaded
         initMaximizeButtons();
+        
+        // Initialize legend toggle button
+        initLegendToggle();
+        console.log('✓ Legend toggle initialized');
     }, 500);
+}
+
+// Display data statistics banner
+function showDataStatistics() {
+    const banner = document.getElementById('dataStatsBanner');
+    const statsText = document.getElementById('dataStatsText');
+    
+    if (banner && statsText && window.dataStatistics) {
+        const stats = window.dataStatistics;
+        statsText.innerHTML = `
+            📊 <strong>${stats.totalRecords.toLocaleString()}</strong> records loaded
+            ${stats.chartPoints ? ` • Charts: <strong>All data</strong> (decimation enabled)` : ''}
+            ${stats.rendered3DPoints ? ` • 3D: <strong>${stats.rendered3DPoints.toLocaleString()}</strong> points` : ''}
+            ${stats.mapSegments ? ` • Map: <strong>${stats.mapSegments.toLocaleString()}</strong> segments` : ''}
+        `;
+        banner.style.display = 'block';
+        
+        // Auto-hide after 10 seconds
+        setTimeout(() => {
+            banner.style.opacity = '0';
+            banner.style.transition = 'opacity 1s';
+            setTimeout(() => {
+                banner.style.display = 'none';
+            }, 1000);
+        }, 10000);
+    }
 }
 
 function processUploadedCSV(file) {
@@ -2792,21 +2986,9 @@ function processUploadedCSV(file) {
         return;
     }
     
-    // Check file size and determine target sample size
+    // Check file size for user info
     const fileSizeMB = file.size / (1024 * 1024);
-    let targetSize = 10000; // Default for large files
-    
-    if (fileSizeMB < 1) {
-        targetSize = 50000; // Keep more data for small files
-    } else if (fileSizeMB < 10) {
-        targetSize = 20000;
-    } else if (fileSizeMB < 50) {
-        targetSize = 10000;
-    } else {
-        targetSize = 5000; // Aggressive sampling for very large files
-    }
-    
-    console.log(`File size: ${fileSizeMB.toFixed(2)} MB, Target sample size: ${targetSize}`);
+    console.log(`File size: ${fileSizeMB.toFixed(2)} MB - processing all records`);
     updateProgressText(`Reading ${fileSizeMB.toFixed(1)} MB file...`);
     
     // Use streaming to parse large CSV files
@@ -2845,16 +3027,48 @@ function processUploadedCSV(file) {
                 dataWorker.terminate();
             }
             
-            dataWorker = new Worker('js/dataProcessor.worker.js');
-            
-            // Handle worker messages
-            dataWorker.onmessage = function(e) {
-                const { type, progress, message, data: processedData, error } = e.data;
+            try {
+                // Add cache-busting version to ensure fresh worker loads
+                dataWorker = new Worker('js/dataProcessor.worker.js?v=' + Date.now());
                 
-                if (type === 'PROGRESS') {
-                    updateProgressText(`${message} (${progress}%)`);
-                } else if (type === 'COMPLETE') {
-                    console.log(`Processed ${processedData.gpsData.length} points (${e.data.originalSize} original rows)`);
+                // Handle worker errors
+                dataWorker.onerror = function(error) {
+                    console.error('Web Worker error:', error);
+                    updateProgressText('Error initializing data processor. Using fallback mode...');
+                    
+                    // Fallback to non-worker processing
+                    setTimeout(() => {
+                        processFallbackMode(streamedData);
+                    }, 500);
+                    
+                    if (dataWorker) {
+                        dataWorker.terminate();
+                        dataWorker = null;
+                    }
+                };
+                
+                // Add timeout in case worker gets stuck
+                const workerTimeout = setTimeout(() => {
+                    console.warn('Worker timeout - switching to fallback mode');
+                    updateProgressText('Processing timeout. Using fallback mode...');
+                    
+                    if (dataWorker) {
+                        dataWorker.terminate();
+                        dataWorker = null;
+                    }
+                    
+                    processFallbackMode(streamedData);
+                }, 30000); // 30 second timeout
+                
+                // Handle worker messages
+                dataWorker.onmessage = function(e) {
+                    clearTimeout(workerTimeout); // Clear timeout on successful message
+                    const { type, progress, message, data: processedData, error } = e.data;
+                    
+                    if (type === 'PROGRESS') {
+                        updateProgressText(`${message} (${progress}%)`);
+                    } else if (type === 'COMPLETE') {
+                    console.log(`Processed all ${e.data.totalRecords} records into ${processedData.gpsData.length} data points`);
                     
                     try {
                         // Use processed data for charts and visualization
@@ -2901,7 +3115,15 @@ function processUploadedCSV(file) {
                         updateProgressText('Creating geographic map...');
                         
                         // Create the geographic map
-                        createMap(flightData.gpsData);
+                        createMap(processedData.gpsData); // Pass full GPS data to map
+                        
+                        // Store statistics for display
+                        window.dataStatistics = {
+                            totalRecords: e.data.totalRecords,
+                            chartPoints: processedData.gpsData.length,
+                            rendered3DPoints: flightData.gpsData.length,
+                            mapSegments: Math.min(3000, processedData.gpsData.length)
+                        };
                         
                         // Continue with visualization
                         completeVisualization();
@@ -2938,14 +3160,22 @@ function processUploadedCSV(file) {
                 }
             };
             
-            // Start processing with worker
-            dataWorker.postMessage({
-                type: 'PROCESS_CSV',
-                data: {
-                    csvData: streamedData,
-                    targetSize: targetSize
-                }
-            });
+                // Start processing with worker - processing ALL data
+                dataWorker.postMessage({
+                    type: 'PROCESS_CSV',
+                    data: {
+                        csvData: streamedData
+                    }
+                });
+            } catch (workerInitError) {
+                console.error('Failed to initialize Web Worker:', workerInitError);
+                updateProgressText('Worker initialization failed. Using fallback mode...');
+                
+                // Use fallback processing
+                setTimeout(() => {
+                    processFallbackMode(streamedData);
+                }, 500);
+            }
         },
         error: function(error) {
             console.error('Error parsing CSV:', error);
@@ -2958,6 +3188,151 @@ function processUploadedCSV(file) {
             }, 2000);
         }
     });
+}
+
+// Fallback processing mode (without Web Worker)
+function processFallbackMode(streamedData) {
+    console.log('Using fallback processing mode (no Web Worker)');
+    updateProgressText('Processing data (fallback mode)...');
+    
+    try {
+        // Find max pressure for altitude calculation
+        let maxPressure = 0;
+        for (let i = 0; i < streamedData.length; i++) {
+            const pressure = parseFloat(streamedData[i].Pressure);
+            if (pressure && pressure > maxPressure) {
+                maxPressure = pressure;
+            }
+        }
+        
+        updateProgressText(`Processing ${streamedData.length.toLocaleString()} records...`);
+        
+        // Process all data
+        const processedData = {
+            gpsData: [],
+            magnetometer: { mx: [], my: [], mz: [] },
+            accelerometer: { ax: [], ay: [], az: [] },
+            altitude: [],
+            pressure: [],
+            temperature: [],
+            timeLabels: []
+        };
+        
+        for (let i = 0; i < streamedData.length; i++) {
+            const row = streamedData[i];
+            
+            if (row.Ax !== undefined && row.Ay !== undefined && row.Az !== undefined && 
+                row.Mx !== undefined && row.My !== undefined && row.Mz !== undefined &&
+                row.lon !== undefined && row.lat !== undefined && row.Pressure !== undefined && 
+                row.Temperature !== undefined) {
+                
+                // GPS data
+                const pressure = parseFloat(row.Pressure);
+                const temperature = parseFloat(row.Temperature);
+                const altitude = pressureToAltitude(pressure, maxPressure);
+                
+                processedData.gpsData.push({
+                    lon: parseFloat(row.lon),
+                    lat: parseFloat(row.lat),
+                    pressure: pressure,
+                    temperature: temperature,
+                    altitude: altitude
+                });
+                
+                // Magnetometer
+                processedData.magnetometer.mx.push(parseFloat(row.Mx));
+                processedData.magnetometer.my.push(parseFloat(row.My));
+                processedData.magnetometer.mz.push(parseFloat(row.Mz));
+                
+                // Accelerometer
+                processedData.accelerometer.ax.push(parseFloat(row.Ax));
+                processedData.accelerometer.ay.push(parseFloat(row.Ay));
+                processedData.accelerometer.az.push(parseFloat(row.Az));
+                
+                // Environmental
+                processedData.pressure.push(pressure);
+                processedData.temperature.push(temperature);
+                processedData.altitude.push(altitude);
+                
+                // Time
+                if (row.datetime) {
+                    processedData.timeLabels.push(new Date(row.datetime));
+                }
+            }
+            
+            // Update progress periodically
+            if (i % 5000 === 0) {
+                const progress = Math.floor((i / streamedData.length) * 70) + 20;
+                updateProgressText(`Processing ${i.toLocaleString()} of ${streamedData.length.toLocaleString()} records... (${progress}%)`);
+            }
+        }
+        
+        console.log(`Processed all ${streamedData.length} records into ${processedData.gpsData.length} data points (fallback mode)`);
+        
+        // Use processed data for charts and visualization
+        updateProgressText('Building charts...');
+        
+        // Store in global allParameterData format
+        allParameterData = {
+            timeLabels: processedData.timeLabels,
+            magnetometer: processedData.magnetometer,
+            accelerometer: processedData.accelerometer,
+            altitude: processedData.altitude,
+            pressure: processedData.pressure,
+            temperature: processedData.temperature
+        };
+        
+        console.log('Parameter data extracted:', allParameterData);
+        
+        // Store original chart data for all parameters
+        originalChartData.magnetometer = createChartDataForParameter('magnetometer');
+        originalChartData.accelerometer = createChartDataForParameter('accelerometer');
+        originalChartData.altitude = createChartDataForParameter('altitude');
+        originalChartData.pressure = createChartDataForParameter('pressure');
+        originalChartData.temperature = createChartDataForParameter('temperature');
+        console.log('Chart data created for all parameters');
+        
+        // Create the charts with initial parameters
+        createParameterChart('magnetometerChart', 'magnetometer', 'chart1Title');
+        createParameterChart('accelerometerChart', 'accelerometer', 'chart2Title');
+        console.log('Parameter charts created');
+        
+        // Add event listeners for parameter selection dropdowns
+        setupParameterDropdowns();
+        console.log('Dropdown event listeners setup complete');
+        
+        updateProgressText('Building 3D flight path...');
+        
+        // Process 3D flight data with optimized data
+        flightData = processDataOptimized(processedData.gpsData, processedData.accelerometer, processedData.magnetometer);
+        createFlightPath(flightData.positions, flightData.gpsData);
+        
+        updateProgressText('Creating geographic map...');
+        
+        // Create the geographic map
+        createMap(processedData.gpsData); // Pass full GPS data to map
+        
+        // Store statistics for display
+        window.dataStatistics = {
+            totalRecords: streamedData.length,
+            chartPoints: processedData.gpsData.length,
+            rendered3DPoints: flightData.gpsData.length,
+            mapSegments: Math.min(3000, processedData.gpsData.length)
+        };
+        
+        // Continue with visualization
+        completeVisualization();
+        
+    } catch (error) {
+        console.error('Error in fallback processing:', error);
+        updateProgressText('Error processing data. Please try again.');
+        setTimeout(() => {
+            const processingOverlay = document.getElementById('processingOverlay');
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            processingOverlay.classList.remove('active');
+            welcomeScreen.classList.remove('hidden');
+        }, 2000);
+    }
 }
 
 // Setup file upload event listeners
@@ -3160,7 +3535,11 @@ function updateColorLegend(gpsData) {
 }
 
 // Initialize parameter selection UI
+let parameterSelectionInitialized = false;
 function initParameterSelection() {
+    // Prevent multiple initializations
+    if (parameterSelectionInitialized) return;
+    
     const parameterButtons = document.querySelectorAll('.parameter-btn');
     
     parameterButtons.forEach(button => {
@@ -3184,6 +3563,10 @@ function initParameterSelection() {
             }
         });
     });
+    
+    // Mark as initialized
+    parameterSelectionInitialized = true;
+    console.log('Parameter selection initialized successfully');
 }
 
 // Function to recolor the visualization based on the current parameter
@@ -3268,110 +3651,159 @@ function updateMapPathColors(gpsData) {
 
 // Function to highlight selected time range on the map
 function highlightMapTimeRange(startIndex, endIndex) {
-    if (!mapHighlightLayer || !window.currentGpsData) {
-        console.log("Map highlight layer or GPS data not available");
+    if (!mapHighlightLayer || !window.currentGpsData || !map) {
+        console.log("Map highlight layer, map, or GPS data not available");
         return;
     }
     
     // Clear any existing highlights
     mapHighlightLayer.clearLayers();
     
-    // Sample points for performance (same as original creation)
-    const sampleInterval = Math.max(1, Math.floor(window.currentGpsData.length / 1000));
-    const sampledData = window.currentGpsData.filter((_, index) => index % sampleInterval === 0);
+    const gpsData = window.currentGpsData;
     
-    // Calculate which segments to highlight
-    const startSegmentIndex = Math.floor(startIndex / sampleInterval);
-    const endSegmentIndex = Math.floor(endIndex / sampleInterval);
+    // Clamp indices to valid range
+    const clampedStart = Math.max(0, Math.floor(startIndex));
+    const clampedEnd = Math.min(gpsData.length - 1, Math.floor(endIndex));
     
-    console.log(`Highlighting map segments ${startSegmentIndex} to ${endSegmentIndex}`);
+    console.log(`Highlighting GPS data from index ${clampedStart} to ${clampedEnd} (out of ${gpsData.length} points)`);
     
-    // Create highlighted segments
+    // Collect all lat/lon points for bounds calculation
+    const latLngs = [];
     const highlightedSegments = [];
-    for (let i = startSegmentIndex; i <= endSegmentIndex && i < sampledData.length - 1; i++) {
-        const point1 = sampledData[i];
-        const point2 = sampledData[i + 1];
+    
+    // Sample for performance if the selection is very large (show up to 500 segments)
+    const selectionSize = clampedEnd - clampedStart;
+    const step = selectionSize > 500 ? Math.ceil(selectionSize / 500) : 1;
+    
+    console.log(`Creating highlight with step size ${step} (${Math.ceil(selectionSize / step)} segments)`);
+    
+    // Create highlighted path segments
+    for (let i = clampedStart; i < clampedEnd; i += step) {
+        const point1 = gpsData[i];
+        const nextIdx = Math.min(i + step, clampedEnd);
+        const point2 = gpsData[nextIdx];
+        
+        if (!point1 || !point2 || !point1.lat || !point1.lon || !point2.lat || !point2.lon) continue;
+        
+        // Add points for bounds calculation
+        latLngs.push([point1.lat, point1.lon]);
+        latLngs.push([point2.lat, point2.lon]);
         
         // Create a thick, bright polyline for highlighting
         const highlightSegment = L.polyline([
             [point1.lat, point1.lon],
             [point2.lat, point2.lon]
         ], {
-            color: '#00FF00', // Bright green
-            weight: 8,
-            opacity: 0.9,
+            color: '#FFD700', // Gold/yellow - more visible
+            weight: 6,
+            opacity: 0.85,
             lineCap: 'round',
             lineJoin: 'round'
         });
         
-        // Add popup with time range info
-        const startTime = new Date(point1.timestamp).toLocaleString();
-        const endTime = new Date(point2.timestamp).toLocaleString();
+        // Add popup with info
         highlightSegment.bindPopup(`
-            <strong>Selected Time Range</strong><br>
-            Start: ${startTime}<br>
-            End: ${endTime}<br>
-            <em>Click to zoom to this segment</em>
+            <strong>🎯 Selected Segment</strong><br>
+            Point ${i} to ${nextIdx}<br>
+            Lat: ${point1.lat.toFixed(6)}, ${point1.lon.toFixed(6)}<br>
+            <em>This segment matches your chart selection</em>
         `);
-        
-        // Add click handler to zoom to this segment
-        highlightSegment.on('click', function() {
-            const bounds = L.latLngBounds([
-                [point1.lat, point1.lon],
-                [point2.lat, point2.lon]
-            ]);
-            map.fitBounds(bounds, { padding: [20, 20] });
-        });
         
         mapHighlightLayer.addLayer(highlightSegment);
         highlightedSegments.push(highlightSegment);
     }
     
-    // Zoom to the highlighted segment
-    if (highlightedSegments.length > 0) {
-        const firstSegment = highlightedSegments[0];
-        const lastSegment = highlightedSegments[highlightedSegments.length - 1];
-        
-        // Get bounds of all highlighted segments
-        const group = new L.featureGroup(highlightedSegments);
-        const bounds = group.getBounds();
-        
-        // Zoom to the highlighted area with some padding
-        map.fitBounds(bounds, { 
-            padding: [30, 30],
-            maxZoom: 15 // Don't zoom too close
-        });
+    // Add start and end markers
+    const startPoint = gpsData[clampedStart];
+    const endPoint = gpsData[clampedEnd];
+    
+    if (startPoint && startPoint.lat && startPoint.lon) {
+        const startMarker = L.circleMarker([startPoint.lat, startPoint.lon], {
+            radius: 8,
+            fillColor: '#00FF00',
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+        }).bindPopup('<strong>🟢 Selection Start</strong>');
+        mapHighlightLayer.addLayer(startMarker);
+        latLngs.push([startPoint.lat, startPoint.lon]);
     }
     
-    console.log(`Added ${highlightedSegments.length} highlighted map segments`);
+    if (endPoint && endPoint.lat && endPoint.lon) {
+        const endMarker = L.circleMarker([endPoint.lat, endPoint.lon], {
+            radius: 8,
+            fillColor: '#FF0000',
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+        }).bindPopup('<strong>🔴 Selection End</strong>');
+        mapHighlightLayer.addLayer(endMarker);
+        latLngs.push([endPoint.lat, endPoint.lon]);
+    }
+    
+    // Automatically zoom to the highlighted segment
+    if (latLngs.length > 0) {
+        const bounds = L.latLngBounds(latLngs);
+        
+        // Smoothly animate to the selected bounds
+        map.flyToBounds(bounds, { 
+            padding: [50, 50],
+            maxZoom: 14, // Good detail level
+            duration: 1.0 // Smooth 1 second animation
+        });
+        
+        console.log(`✓ Zooming map to selected region with ${highlightedSegments.length} highlighted segments`);
+    }
 }
 
 // Initialize legend toggle functionality
+let legendToggleInitialized = false;
 function initLegendToggle() {
     const toggleButton = document.getElementById('legendToggle');
     const legend = document.getElementById('colorLegend');
     
-    if (!toggleButton || !legend) return;
+    if (!toggleButton || !legend) {
+        console.error('❌ Legend toggle elements not found!', { toggleButton, legend });
+        return;
+    }
+    
+    // Prevent multiple initializations
+    if (legendToggleInitialized) {
+        console.log('✓ Legend toggle already initialized');
+        return;
+    }
     
     // Set initial state - legend is hidden by default
     let isLegendVisible = false;
     
-    toggleButton.addEventListener('click', () => {
+    // Remove any existing click listeners by cloning and replacing
+    const newButton = toggleButton.cloneNode(true);
+    toggleButton.parentNode.replaceChild(newButton, toggleButton);
+    
+    newButton.addEventListener('click', () => {
         isLegendVisible = !isLegendVisible;
         
         if (isLegendVisible) {
             // Show legend
             legend.classList.remove('hidden');
-            toggleButton.textContent = 'Hide Legend';
+            newButton.textContent = 'Hide Legend';
+            console.log('✓ Legend shown');
         } else {
             // Hide legend
             legend.classList.add('hidden');
-            toggleButton.textContent = 'Show Legend';
+            newButton.textContent = 'Show Legend';
+            console.log('✓ Legend hidden');
         }
     });
     
     // Set initial button text
-    toggleButton.textContent = isLegendVisible ? 'Hide Legend' : 'Show Legend';
+    newButton.textContent = isLegendVisible ? 'Hide Legend' : 'Show Legend';
+    
+    // Mark as initialized
+    legendToggleInitialized = true;
+    console.log('✓ Legend toggle initialized successfully');
 }
 
 // Create flight path from positions
