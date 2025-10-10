@@ -2897,6 +2897,12 @@ function processDataOptimized(gpsData, accelerometerData, magnetometerData) {
     // Initialize parameter selection UI
     initParameterSelection();
     
+    // Store global references for recoloring
+    window.currentGpsData = sampled3DData;
+    window.totalPositions = positions.length;
+    
+    console.log(`Stored global references: totalPositions=${positions.length}, gpsData=${sampled3DData.length}`);
+    
     return {
         positions: positions,
         orientations: orientations,
@@ -3424,11 +3430,14 @@ function calculateParameterBoundaries(gpsData) {
             max: maxVal
         };
         
-        console.log(`${paramKey} boundaries calculated:`, parameterBoundaries[paramKey]);
+        console.log(`%c${paramKey} boundaries calculated:`, 'font-weight: bold; color: blue;', parameterBoundaries[paramKey]);
+        console.log(`  Range: ${minVal.toFixed(2)} to ${maxVal.toFixed(2)}, Step: ${step.toFixed(2)}`);
     });
     
     // Update legacy reference
     altitudeBoundaries = parameterBoundaries.altitude;
+    
+    console.log('%cAll parameter boundaries calculated successfully', 'font-weight: bold; color: green;');
 }
 
 // Function to calculate altitude boundaries based on GPS data (legacy support)
@@ -3541,9 +3550,12 @@ function initParameterSelection() {
     if (parameterSelectionInitialized) return;
     
     const parameterButtons = document.querySelectorAll('.parameter-btn');
+    console.log(`Found ${parameterButtons.length} parameter buttons`);
     
     parameterButtons.forEach(button => {
         button.addEventListener('click', () => {
+            console.log(`%cParameter button clicked: ${button.dataset.parameter}`, 'font-weight: bold; color: purple;');
+            
             // Remove active class from all buttons
             parameterButtons.forEach(btn => btn.classList.remove('active'));
             
@@ -3552,31 +3564,65 @@ function initParameterSelection() {
             
             // Update current parameter
             const newParameter = button.dataset.parameter;
-            if (newParameter && newParameter !== currentColorParameter) {
+            console.log(`Current: ${currentColorParameter} → New: ${newParameter}`);
+            
+            if (newParameter) {
+                const oldParameter = currentColorParameter;
                 currentColorParameter = newParameter;
                 
                 // Update legacy reference
                 altitudeBoundaries = parameterBoundaries[currentColorParameter];
                 
+                console.log(`%cParameter changed from ${oldParameter} to ${currentColorParameter}`, 'font-weight: bold; color: orange;');
+                
                 // Re-render visualization with new parameter
                 recolorVisualization();
+            } else {
+                console.error('New parameter is undefined!');
             }
         });
     });
     
     // Mark as initialized
     parameterSelectionInitialized = true;
-    console.log('Parameter selection initialized successfully');
+    console.log('%cParameter selection initialized successfully', 'font-weight: bold; color: green;');
+    
+    // Add global test function for debugging
+    window.testRecolor = function(param) {
+        if (param && ['altitude', 'pressure', 'temperature'].includes(param)) {
+            currentColorParameter = param;
+            console.log(`%cManually setting parameter to: ${param}`, 'font-weight: bold; color: red;');
+            recolorVisualization();
+        } else {
+            console.log('Usage: testRecolor("altitude"), testRecolor("pressure"), or testRecolor("temperature")');
+        }
+    };
+    console.log('%cDebug function available: testRecolor("altitude|pressure|temperature")', 'color: gray; font-style: italic;');
 }
 
 // Function to recolor the visualization based on the current parameter
 function recolorVisualization() {
+    console.log(`%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'color: cyan;');
+    console.log(`%cStarting recolor with parameter: ${currentColorParameter}`, 'font-weight: bold; font-size: 14px; color: cyan;');
+    console.log(`PathSegments available: ${window.pathSegments ? window.pathSegments.length : 0}`);
+    console.log(`GPS data available: ${window.currentGpsData ? window.currentGpsData.length : 0}`);
+    console.log(`Total positions: ${window.totalPositions}`);
+    
     // Update color legend
     updateColorLegend(window.currentGpsData);
     
     // Recolor 3D path segments
     if (window.pathSegments && window.currentGpsData) {
-        window.pathSegments.forEach(segment => {
+        const gpsData = window.currentGpsData;
+        const boundaries = parameterBoundaries[currentColorParameter];
+        
+        console.log(`%cBoundaries for ${currentColorParameter}:`, 'font-weight: bold;', boundaries);
+        
+        let updateCount = 0;
+        let colorDistribution = { low: 0, mediumLow: 0, medium: 0, mediumHigh: 0, high: 0 };
+        let valueStats = { min: Infinity, max: -Infinity, sum: 0, count: 0 };
+        
+        window.pathSegments.forEach((segment, i) => {
             const mesh = segment.mesh;
             const dataStartIndex = mesh.userData.dataStartIndex;
             const dataEndIndex = mesh.userData.dataEndIndex;
@@ -3585,7 +3631,6 @@ function recolorVisualization() {
             let totalValue = 0;
             let valueCount = 0;
             
-            const gpsData = window.currentGpsData;
             const segmentStartIndex = Math.floor((dataStartIndex / window.totalPositions) * gpsData.length);
             const segmentEndIndex = Math.min(Math.floor((dataEndIndex / window.totalPositions) * gpsData.length), gpsData.length - 1);
             
@@ -3598,16 +3643,78 @@ function recolorVisualization() {
             
             if (valueCount > 0) {
                 const avgValue = totalValue / valueCount;
-                mesh.material = getMaterialForParameter(avgValue, currentColorParameter);
+                
+                // Track value statistics
+                valueStats.min = Math.min(valueStats.min, avgValue);
+                valueStats.max = Math.max(valueStats.max, avgValue);
+                valueStats.sum += avgValue;
+                valueStats.count++;
+                
+                // Get the appropriate material
+                const baseMaterial = getMaterialForParameter(avgValue, currentColorParameter);
+                
+                // CLONE the material to create a unique instance for this mesh
+                const newMaterial = baseMaterial.clone();
+                newMaterial.needsUpdate = true;
+                
+                // Dispose old material if it exists
+                if (mesh.material && mesh.material !== purpleSelectionMaterial) {
+                    mesh.material.dispose();
+                }
+                
+                // Assign the new material
+                mesh.material = newMaterial;
+                
+                // Track color distribution for debugging
+                const category = getParameterCategoryName(avgValue, currentColorParameter);
+                if (category === 'Low') colorDistribution.low++;
+                else if (category === 'Medium-Low') colorDistribution.mediumLow++;
+                else if (category === 'Medium') colorDistribution.medium++;
+                else if (category === 'Medium-High') colorDistribution.mediumHigh++;
+                else if (category === 'High') colorDistribution.high++;
+                
+                // Update stored original materials
+                if (!originalSegmentMaterials[i]) {
+                    originalSegmentMaterials[i] = {
+                        material: newMaterial,
+                        opacity: newMaterial.opacity
+                    };
+                } else {
+                    originalSegmentMaterials[i].material = newMaterial;
+                    originalSegmentMaterials[i].opacity = newMaterial.opacity;
+                }
+                
+                updateCount++;
+                
+                // Debug log for first few segments
+                if (i < 5) {
+                    console.log(`  Segment ${i}: value=${avgValue.toFixed(2)}, category=${category}, range=[${segmentStartIndex},${segmentEndIndex}]`);
+                }
             }
         });
+        
+        console.log(`%c✓ Updated ${updateCount} segment materials`, 'color: green; font-weight: bold;');
+        console.log(`%cColor distribution:`, 'font-weight: bold;', colorDistribution);
+        
+        if (valueStats.count > 0) {
+            const avg = valueStats.sum / valueStats.count;
+            console.log(`%cValue statistics:`, 'font-weight: bold;', {
+                min: valueStats.min.toFixed(2),
+                max: valueStats.max.toFixed(2),
+                average: avg.toFixed(2),
+                range: (valueStats.max - valueStats.min).toFixed(2)
+            });
+        }
     }
     
     // Recolor map path - update existing segments instead of recreating
     if (window.flightPathLayer && window.currentGpsData) {
-        // Update existing path colors without clearing/recreating
         updateMapPathColors(window.currentGpsData);
+        console.log(`%c✓ Map path colors updated`, 'color: green;');
     }
+    
+    console.log(`%c✓ Recolor complete for parameter: ${currentColorParameter}`, 'font-weight: bold; font-size: 14px; color: green;');
+    console.log(`%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'color: cyan;');
 }
 
 // Function to update map path colors without recreating the entire path
@@ -3899,15 +4006,15 @@ function createFlightPath(positions, gpsData = null) {
         ribbonGeometry.setIndex(indices);
         ribbonGeometry.computeVertexNormals();
         
-        // Determine material based on altitude data
-        let segmentMaterial = altitudeMaterials.medium; // Default material
+        // Determine material based on current color parameter
+        let segmentMaterial = materialSets[currentColorParameter].medium; // Default material
         
         if (gpsData && gpsData.length > 0) {
             // Calculate the GPS data index corresponding to this segment
             const segmentStartIndex = Math.floor((i / positions.length) * gpsData.length);
             const segmentEndIndex = Math.min(Math.floor(((i + segmentLength) / positions.length) * gpsData.length), gpsData.length - 1);
             
-            // Calculate average altitude for this segment
+            // Calculate average value for this segment
             let totalValue = 0;
             let valueCount = 0;
             
@@ -3920,8 +4027,16 @@ function createFlightPath(positions, gpsData = null) {
             
             if (valueCount > 0) {
                 const avgValue = totalValue / valueCount;
-                segmentMaterial = getMaterialForParameter(avgValue, currentColorParameter);
+                const baseMaterial = getMaterialForParameter(avgValue, currentColorParameter);
+                // CLONE material to create unique instance for each mesh
+                segmentMaterial = baseMaterial.clone();
+            } else {
+                // Clone default material as well
+                segmentMaterial = segmentMaterial.clone();
             }
+        } else {
+            // Clone default material
+            segmentMaterial = segmentMaterial.clone();
         }
         
         // Create mesh for this segment
@@ -4323,6 +4438,9 @@ function setupTooltipRaycasting() {
     // Calculate mouse position in normalized device coordinates
     function onMouseMove(event) {
         // Get the 3D container's bounding rectangle (top-left quarter of screen)
+        const containerElement = document.getElementById('container');
+        if (!containerElement) return;
+        
         const containerRect = containerElement.getBoundingClientRect();
         
         // Check if mouse is within the 3D visualization area
