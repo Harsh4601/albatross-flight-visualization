@@ -83,6 +83,7 @@ albatross-flight-visualization/
 ### Quick Start
 1. Open `index.html` in a web browser
 2. Click "Choose CSV File" and select your data file (supports up to 200MB+)
+   - **Sample CSV files are available in the `assets/` folder** (`detailed.csv` and `combined.csv`)
 3. Watch the real-time progress as your file loads
 4. Interact with the 3D visualization using mouse controls
 5. Select time ranges on the charts to focus the 3D view
