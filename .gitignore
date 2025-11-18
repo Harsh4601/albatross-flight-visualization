@@ -8,3 +8,7 @@ assets/*.csv
 
 # Dependencies
 node_modules/
+
+# Documentation and paper files
+README.md
+*.tex
