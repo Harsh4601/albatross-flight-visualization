@@ -118,6 +118,13 @@
         
         <!-- Magnetometer Chart Section -->
             <div class="graph-section">
+                <button class="zoom-out-btn" id="zoomOutBtn1" title="Zoom Out to Full Range" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                        <line x1="8" y1="11" x2="14" y2="11"></line>
+                    </svg>
+                </button>
                 <button class="maximize-btn" data-section="magnetometer" title="Maximize Magnetometer Chart">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
@@ -135,13 +142,20 @@
                 </div>
                 <h3 id="chart1Title">Magnetometer vs Time</h3>
                 <div style="font-size: 9px; color: #888; text-align: center; margin-bottom: 5px; line-height: 1.2;">
-                    💡 <strong>Tip:</strong> Click & drag to select time range • Syncs with 3D view & zooms map
+                    💡 <strong>Tip:</strong> Click & drag to zoom in • Drag again to zoom in further • Drag selection rectangle to move along timeline • Click zoom out to reset • Syncs with 3D view & zooms map
                 </div>
                 <canvas id="magnetometerChart"></canvas>
             </div>
         
         <!-- Accelerometer Chart Section -->
             <div class="graph-section">
+                <button class="zoom-out-btn" id="zoomOutBtn2" title="Zoom Out to Full Range" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                        <line x1="8" y1="11" x2="14" y2="11"></line>
+                    </svg>
+                </button>
                 <button class="maximize-btn" data-section="accelerometer" title="Maximize Accelerometer Chart">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
@@ -159,7 +173,7 @@
                 </div>
                 <h3 id="chart2Title">Accelerometer vs Time</h3>
                 <div style="font-size: 9px; color: #888; text-align: center; margin-bottom: 5px; line-height: 1.2;">
-                    💡 <strong>Tip:</strong> Click & drag to select time range • Syncs with 3D view & zooms map
+                    💡 <strong>Tip:</strong> Click & drag to zoom in • Drag again to zoom in further • Drag selection rectangle to move along timeline • Click zoom out to reset • Syncs with 3D view & zooms map
                 </div>
                 <canvas id="accelerometerChart"></canvas>
         </div>

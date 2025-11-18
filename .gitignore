@@ -5,3 +5,6 @@
 # CSV data files (can be large, users will upload their own)
 assets/*.csv
 *.csv
+
+# Dependencies
+node_modules/

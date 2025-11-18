@@ -849,11 +849,189 @@ let allParameterData = {
     temperature: []
 };
 
+// Function to show/hide zoom out buttons
+function updateZoomOutButtons(show) {
+    const zoomOutBtn1 = document.getElementById('zoomOutBtn1');
+    const zoomOutBtn2 = document.getElementById('zoomOutBtn2');
+    
+    if (zoomOutBtn1) {
+        zoomOutBtn1.style.display = show ? 'flex' : 'none';
+    }
+    if (zoomOutBtn2) {
+        zoomOutBtn2.style.display = show ? 'flex' : 'none';
+    }
+}
+
+// Function to create draggable selection overlay
+function createDraggableSelectionOverlay(chart, chartType) {
+    if (!selectedTimeRange || !originalChartData.magnetometer) return;
+    
+    const canvas = chart.canvas;
+    const parent = canvas.parentElement;
+    
+    // Remove any existing draggable overlays
+    const existingOverlays = parent.querySelectorAll('[data-draggable-selection]');
+    existingOverlays.forEach(overlay => overlay.remove());
+    
+    // Create overlay that spans the full visible range (since we're zoomed in)
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-draggable-selection', 'true');
+    overlay.style.position = 'absolute';
+    overlay.style.backgroundColor = 'rgba(54, 162, 235, 0.15)';
+    overlay.style.border = '2px solid rgba(54, 162, 235, 0.6)';
+    overlay.style.borderTop = 'none';
+    overlay.style.borderBottom = 'none';
+    overlay.style.cursor = 'grab';
+    overlay.style.zIndex = '1001';
+    overlay.style.boxSizing = 'border-box';
+    overlay.style.userSelect = 'none';
+    overlay.title = 'Drag to move selection along timeline';
+    
+    // Position overlay to span full chart width (since we're showing the selected range)
+    const canvasRect = canvas.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    const chartArea = chart.chartArea;
+    const yScale = chart.scales.y;
+    
+    const canvasOffsetTop = canvasRect.top - parentRect.top;
+    const canvasOffsetLeft = canvasRect.left - parentRect.left;
+    
+    overlay.style.left = `${canvasOffsetLeft + chartArea.left}px`;
+    overlay.style.top = `${canvasOffsetTop + yScale.getPixelForValue(yScale.max)}px`;
+    overlay.style.width = `${chartArea.right - chartArea.left}px`;
+    overlay.style.height = `${yScale.getPixelForValue(yScale.min) - yScale.getPixelForValue(yScale.max)}px`;
+    
+    parent.appendChild(overlay);
+    
+    // Drag functionality
+    let isDragging = false;
+    let hasDragged = false;
+    let dragStartX = 0;
+    let dragStartTimeRange = null;
+    const DRAG_THRESHOLD = 5; // pixels - minimum movement to consider it a drag
+    
+    overlay.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        hasDragged = false;
+        dragStartX = e.clientX;
+        dragStartTimeRange = { ...selectedTimeRange };
+        overlay.style.cursor = 'grabbing';
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging || !dragStartTimeRange) return;
+        
+        const dragOffsetX = e.clientX - dragStartX;
+        
+        // Check if we've moved enough to consider it a drag
+        if (Math.abs(dragOffsetX) > DRAG_THRESHOLD) {
+            hasDragged = true;
+        }
+        
+        // Only process drag if we've moved beyond threshold
+        if (!hasDragged) return;
+        
+        if (!originalChartData.magnetometer) return;
+        
+        const originalLabels = originalChartData.magnetometer.timeLabels;
+        const duration = dragStartTimeRange.endIndex - dragStartTimeRange.startIndex;
+        
+        // Get the time span of the selected range in the original data
+        const selectedStartTime = originalLabels[dragStartTimeRange.startIndex];
+        const selectedEndTime = originalLabels[dragStartTimeRange.endIndex];
+        const selectedTimeSpanMs = selectedEndTime.getTime() - selectedStartTime.getTime();
+        
+        // Get the pixel span of the zoomed chart (which displays the selected range)
+        const chartArea = chart.chartArea;
+        const visiblePixelSpan = chartArea.right - chartArea.left;
+        
+        // Calculate how much time each pixel represents in the zoomed view
+        // This is the selected time span divided by the pixel width
+        const msPerPixel = selectedTimeSpanMs / visiblePixelSpan;
+        
+        // Convert drag offset to time offset in the original timeline
+        const timeOffsetMs = dragOffsetX * msPerPixel;
+        
+        // Calculate new start time
+        const newStartTimeMs = selectedStartTime.getTime() + timeOffsetMs;
+        
+        // Find closest index in original data for the new start time
+        let newStartIndex = 0;
+        let minDiff = Math.abs(originalLabels[0].getTime() - newStartTimeMs);
+        
+        for (let i = 1; i < originalLabels.length; i++) {
+            const diff = Math.abs(originalLabels[i].getTime() - newStartTimeMs);
+            if (diff < minDiff) {
+                minDiff = diff;
+                newStartIndex = i;
+            }
+        }
+        
+        // Calculate new end index maintaining the same duration
+        let newEndIndex = newStartIndex + duration;
+        
+        // Clamp to valid bounds
+        const maxIndex = originalLabels.length - 1;
+        if (newEndIndex > maxIndex) {
+            newEndIndex = maxIndex;
+            newStartIndex = Math.max(0, newEndIndex - duration);
+        }
+        if (newStartIndex < 0) {
+            newStartIndex = 0;
+            newEndIndex = Math.min(maxIndex, duration);
+        }
+        
+        // Update selection if valid and different from current
+        if (newStartIndex >= 0 && newEndIndex <= maxIndex && newEndIndex > newStartIndex &&
+            (newStartIndex !== selectedTimeRange.startIndex || newEndIndex !== selectedTimeRange.endIndex)) {
+            
+            selectedTimeRange.startIndex = newStartIndex;
+            selectedTimeRange.endIndex = newEndIndex;
+            
+            // Update charts and views
+            updateChartsWithTimeRange(newStartIndex, newEndIndex);
+            focusCameraOnTimeRange(newStartIndex, newEndIndex);
+            
+            // Update map highlighting
+            if (window.currentGpsData) {
+                const totalChartPoints = originalChartData.magnetometer.timeLabels.length;
+                const totalGpsPoints = window.currentGpsData.length;
+                const actualStartIndex = Math.floor((newStartIndex / totalChartPoints) * totalGpsPoints);
+                const actualEndIndex = Math.min(Math.floor((newEndIndex / totalChartPoints) * totalGpsPoints), totalGpsPoints - 1);
+                highlightMapTimeRange(actualStartIndex, actualEndIndex);
+            }
+        }
+    });
+    
+    document.addEventListener('mouseup', (e) => {
+        if (isDragging) {
+            // If user clicked but didn't drag, remove overlay to allow new selection within zoomed view
+            if (!hasDragged) {
+                overlay.remove();
+                // Keep the zoomed view but remove overlay so user can make a new selection
+                // The chart data remains filtered/zoomed, allowing nested zooming
+            }
+            
+            isDragging = false;
+            hasDragged = false;
+            overlay.style.cursor = 'grab';
+            dragStartTimeRange = null;
+        }
+    });
+    
+    return overlay;
+}
+
 // Function to handle time range selection
 function onTimeRangeSelected(startIndex, endIndex, sourceChart) {
     console.log(`Time range selected: index ${startIndex} to ${endIndex}`);
     console.log(`Path segments available: ${window.pathSegments ? window.pathSegments.length : 'NONE'}`);
     selectedTimeRange = { startIndex: startIndex, endIndex: endIndex };
+    
+    // Show zoom out buttons
+    updateZoomOutButtons(true);
     
     // Update both charts with the selected time range
     updateChartsWithTimeRange(startIndex, endIndex);
@@ -876,6 +1054,16 @@ function onTimeRangeSelected(startIndex, endIndex, sourceChart) {
         // Highlight and zoom to the corresponding segment on the map
         highlightMapTimeRange(actualStartIndex, actualEndIndex);
     }
+    
+    // Create draggable overlays after charts are updated
+    setTimeout(() => {
+        if (magnetometerChart) {
+            createDraggableSelectionOverlay(magnetometerChart, 'magnetometer');
+        }
+        if (accelerometerChart) {
+            createDraggableSelectionOverlay(accelerometerChart, 'accelerometer');
+        }
+    }, 100);
 }
 
 // Function to update both charts with selected time range
@@ -889,6 +1077,18 @@ function updateChartsWithTimeRange(startIndex, endIndex) {
     // Filter accelerometer data by index range
     const accelData = filterDataByIndexRange(originalChartData.accelerometer, startIndex, endIndex);
     updateAccelerometerChart(accelData);
+    
+    // Recreate draggable overlays after chart updates
+    if (selectedTimeRange) {
+        setTimeout(() => {
+            if (magnetometerChart) {
+                createDraggableSelectionOverlay(magnetometerChart, 'magnetometer');
+            }
+            if (accelerometerChart) {
+                createDraggableSelectionOverlay(accelerometerChart, 'accelerometer');
+            }
+        }, 50);
+    }
 }
 
 // Function to filter data by index range
@@ -1023,6 +1223,13 @@ function highlightTimeRangeSegment(startIndex, endIndex) {
 // Function to reset time selection
 function resetTimeSelection() {
     selectedTimeRange = null;
+    
+    // Hide zoom out buttons
+    updateZoomOutButtons(false);
+    
+    // Clean up all draggable selection overlays
+    const allDraggableOverlays = document.querySelectorAll('[data-draggable-selection]');
+    allDraggableOverlays.forEach(overlay => overlay.remove());
     
     // Clean up all selection overlays
     const allCanvases = document.querySelectorAll('canvas');
@@ -2088,6 +2295,11 @@ function addTimeSelectionToChart(chart, chartType) {
             // Clean up any existing selection overlays first
             cleanupSelectionOverlays(canvas);
             
+            // Clean up draggable overlays when starting a new selection
+            const parent = canvas.parentElement;
+            const draggableOverlays = parent.querySelectorAll('[data-draggable-selection]');
+            draggableOverlays.forEach(overlay => overlay.remove());
+            
             // Create visual overlay
             selectionOverlay = createSelectionOverlay();
             
@@ -2109,15 +2321,61 @@ function addTimeSelectionToChart(chart, chartType) {
         }
     });
 
+    // Function to map filtered chart indices to original data indices
+    function mapToOriginalIndices(filteredStartIndex, filteredEndIndex) {
+        // If not zoomed in, indices are already in original data
+        if (!selectedTimeRange || !originalChartData.magnetometer) {
+            return { startIndex: filteredStartIndex, endIndex: filteredEndIndex };
+        }
+        
+        // Get the time values from the filtered/zoomed chart
+        const filteredStartTime = chart.data.labels[filteredStartIndex];
+        const filteredEndTime = chart.data.labels[filteredEndIndex];
+        
+        // Map these time values to indices in the original data
+        const originalLabels = originalChartData.magnetometer.timeLabels;
+        
+        // Find closest indices in original data for start time
+        let originalStartIndex = 0;
+        let minDiff = Math.abs(originalLabels[0].getTime() - filteredStartTime.getTime());
+        for (let i = 1; i < originalLabels.length; i++) {
+            const diff = Math.abs(originalLabels[i].getTime() - filteredStartTime.getTime());
+            if (diff < minDiff) {
+                minDiff = diff;
+                originalStartIndex = i;
+            }
+        }
+        
+        // Find closest indices in original data for end time
+        let originalEndIndex = 0;
+        minDiff = Math.abs(originalLabels[0].getTime() - filteredEndTime.getTime());
+        for (let i = 1; i < originalLabels.length; i++) {
+            const diff = Math.abs(originalLabels[i].getTime() - filteredEndTime.getTime());
+            if (diff < minDiff) {
+                minDiff = diff;
+                originalEndIndex = i;
+            }
+        }
+        
+        // Ensure start < end
+        if (originalStartIndex > originalEndIndex) {
+            [originalStartIndex, originalEndIndex] = [originalEndIndex, originalStartIndex];
+        }
+        
+        return { startIndex: originalStartIndex, endIndex: originalEndIndex };
+    }
+
     // Mouse up event
     canvas.addEventListener('mouseup', (e) => {
         if (isSelecting && selectionStart !== null && selectionEnd !== null) {
-            const startTime = Math.min(selectionStart, selectionEnd);
-            const endTime = Math.max(selectionStart, selectionEnd);
+            const filteredStart = Math.min(selectionStart, selectionEnd);
+            const filteredEnd = Math.max(selectionStart, selectionEnd);
             
             // Only trigger selection if there's a meaningful range (at least 2 data points)
-            if (Math.abs(endTime - startTime) >= 1) {
-                onTimeRangeSelected(startTime, endTime, chartType);
+            if (Math.abs(filteredEnd - filteredStart) >= 1) {
+                // Map filtered indices to original data indices (handles nested zooming)
+                const { startIndex, endIndex } = mapToOriginalIndices(filteredStart, filteredEnd);
+                onTimeRangeSelected(startIndex, endIndex, chartType);
             }
             
             // Clean up overlay
@@ -4152,6 +4410,20 @@ function initPathNavigation() {
         globalResetBtn.classList.remove('hidden');
         globalResetBtn.addEventListener('click', () => {
             globalReset();
+        });
+    }
+    
+    // Set up zoom out buttons
+    const zoomOutBtn1 = document.getElementById('zoomOutBtn1');
+    const zoomOutBtn2 = document.getElementById('zoomOutBtn2');
+    if (zoomOutBtn1) {
+        zoomOutBtn1.addEventListener('click', () => {
+            resetTimeSelection();
+        });
+    }
+    if (zoomOutBtn2) {
+        zoomOutBtn2.addEventListener('click', () => {
+            resetTimeSelection();
         });
     }
     

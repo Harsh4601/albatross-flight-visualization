@@ -1120,6 +1120,52 @@ body {
     right: 26px;
 }
 
+.zoom-out-btn {
+    position: absolute;
+    top: 10px;
+    right: 52px;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2563eb;
+    transition: all 0.3s ease;
+    z-index: 1002;
+    box-shadow: 
+        0 6px 20px rgba(0, 0, 0, 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.zoom-out-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    color: white;
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 
+        0 8px 25px rgba(37, 99, 235, 0.4),
+        0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.zoom-out-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.graph-section .zoom-out-btn {
+    top: 26px;
+    right: 68px;
+}
+
+.section-fullscreen .zoom-out-btn {
+    top: 20px !important;
+    right: 72px !important;
+}
+
 /* Parameter selection positioned at top left */
 .parameter-selector-top {
     position: absolute;
