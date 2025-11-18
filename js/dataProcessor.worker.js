@@ -4,14 +4,8 @@
 // Note: PapaParse is not needed here as CSV parsing is done in the main thread
 // The worker receives already-parsed data objects
 
-// Calculate altitude from pressure
-function pressureToAltitude(pressure, seaLevelPressure) {
-    if (!pressure || !seaLevelPressure || pressure <= 0) return 0;
-    return 44330 * (1 - Math.pow(pressure / seaLevelPressure, 1/5.255));
-}
-
 // Process data in chunks
-function processDataChunk(chunk, maxPressure) {
+function processDataChunk(chunk) {
     const processed = {
         positions: [],
         gpsData: [],
@@ -31,17 +25,18 @@ function processDataChunk(chunk, maxPressure) {
             row.lon !== undefined && row.lat !== undefined && row.Pressure !== undefined && 
             row.Temperature !== undefined) {
             
-            // GPS data
+            // GPS data - use altitude directly from CSV (can be negative)
             const pressure = parseFloat(row.Pressure);
             const temperature = parseFloat(row.Temperature);
-            const altitude = pressureToAltitude(pressure, maxPressure);
+            const altitude = row.altitude !== undefined ? parseFloat(row.altitude) : 0;
+            const altitudeVal = isNaN(altitude) ? 0 : altitude;
             
             processed.gpsData.push({
                 lon: parseFloat(row.lon),
                 lat: parseFloat(row.lat),
                 pressure: pressure,
                 temperature: temperature,
-                altitude: altitude
+                altitude: altitudeVal
             });
             
             // Magnetometer
@@ -57,7 +52,7 @@ function processDataChunk(chunk, maxPressure) {
             // Environmental
             processed.pressure.push(pressure);
             processed.temperature.push(temperature);
-            processed.altitude.push(altitude);
+            processed.altitude.push(altitudeVal);
             
             // Time
             if (row.datetime) {
@@ -106,30 +101,19 @@ self.addEventListener('message', function(e) {
         const { csvData } = data;
         
         try {
-            // Step 1: Find max pressure for altitude calculation
-            self.postMessage({ type: 'PROGRESS', progress: 10, message: 'Analyzing pressure data...' });
-            
-            let maxPressure = 0;
-            for (let i = 0; i < csvData.length; i++) {
-                const pressure = parseFloat(csvData[i].Pressure);
-                if (pressure && pressure > maxPressure) {
-                    maxPressure = pressure;
-                }
-            }
-            
-            // Step 2: Process all data in chunks to allow progress updates
-            self.postMessage({ type: 'PROGRESS', progress: 20, message: `Processing all ${csvData.length} records...` });
+            // Step 1: Process all data in chunks to allow progress updates
+            self.postMessage({ type: 'PROGRESS', progress: 10, message: `Processing all ${csvData.length} records...` });
             
             const chunkSize = 5000; // Process in larger chunks for efficiency
             const chunks = [];
             
             for (let i = 0; i < csvData.length; i += chunkSize) {
                 const chunk = csvData.slice(i, Math.min(i + chunkSize, csvData.length));
-                const processed = processDataChunk(chunk, maxPressure);
+                const processed = processDataChunk(chunk);
                 chunks.push(processed);
                 
                 // Update progress
-                const progress = 20 + (i / csvData.length) * 70;
+                const progress = 10 + (i / csvData.length) * 85;
                 self.postMessage({ 
                     type: 'PROGRESS', 
                     progress: Math.floor(progress),

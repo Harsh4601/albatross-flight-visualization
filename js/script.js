@@ -1142,16 +1142,9 @@ function extractAllParameterData(data) {
             pressure.push(pressureVal);
             temperature.push(parseFloat(row.Temperature));
             
-            // For now, use a temporary altitude calculation - we'll fix it after processing all data
-            altitude.push(0); // Placeholder
-        }
-    }
-    
-    // Calculate altitude from pressure after all data is processed
-    if (pressure.length > 0) {
-        const maxPressure = Math.max(...pressure.filter(p => !isNaN(p)));
-        for (let i = 0; i < pressure.length; i++) {
-            altitude[i] = pressureToAltitude(pressure[i], maxPressure);
+            // Use altitude directly from CSV (can be negative)
+            const altitudeVal = row.altitude !== undefined ? parseFloat(row.altitude) : 0;
+            altitude.push(isNaN(altitudeVal) ? 0 : altitudeVal);
         }
     }
     
@@ -1181,13 +1174,7 @@ function extractAllParameterData(data) {
             sampledData.temperature.push(temperature[i]);
         }
         
-        // Recalculate altitude for sampled data
-        if (sampledData.pressure.length > 0) {
-            const maxPressure = Math.max(...sampledData.pressure.filter(p => !isNaN(p)));
-            for (let i = 0; i < sampledData.pressure.length; i++) {
-                sampledData.altitude[i] = pressureToAltitude(sampledData.pressure[i], maxPressure);
-            }
-        }
+        // Altitude is already from CSV, no need to recalculate
         
         return sampledData;
     }
@@ -2666,15 +2653,17 @@ function processData(data) {
                 z: parseFloat(row.Mz)
             });
             
-            // Store pressure and temperature data - altitude will be calculated later with proper reference
+            // Store pressure and temperature data - use altitude directly from CSV
             const pressure = parseFloat(row.Pressure);
             const temperature = parseFloat(row.Temperature);
+            const altitude = row.altitude !== undefined ? parseFloat(row.altitude) : 0;
             
             gpsData.push({
                 lon: parseFloat(row.lon),
                 lat: parseFloat(row.lat),
-                pressure: pressure, // Store pressure for altitude calculation
-                temperature: temperature // Store temperature data
+                pressure: pressure,
+                temperature: temperature,
+                altitude: isNaN(altitude) ? 0 : altitude // Use CSV altitude directly (can be negative)
             });
         }
     }
@@ -2683,12 +2672,6 @@ function processData(data) {
     let sampledAccelData = accelData;
     let sampledMagData = magData;
     let sampledGpsData = gpsData;
-    
-    // Calculate pressure-based altitudes using max pressure as sea level reference
-    const maxPressure = findMaxPressure(sampledGpsData);
-    sampledGpsData.forEach(gps => {
-        gps.altitude = pressureToAltitude(gps.pressure, maxPressure);
-    });
     
     console.log(`Processing ${accelData.length} data points from CSV (using all records)`);
     console.log(`Pressure range: ${Math.min(...sampledGpsData.map(g => g.pressure)).toFixed(1)} - ${Math.max(...sampledGpsData.map(g => g.pressure)).toFixed(1)} hPa`);
@@ -3202,15 +3185,6 @@ function processFallbackMode(streamedData) {
     updateProgressText('Processing data (fallback mode)...');
     
     try {
-        // Find max pressure for altitude calculation
-        let maxPressure = 0;
-        for (let i = 0; i < streamedData.length; i++) {
-            const pressure = parseFloat(streamedData[i].Pressure);
-            if (pressure && pressure > maxPressure) {
-                maxPressure = pressure;
-            }
-        }
-        
         updateProgressText(`Processing ${streamedData.length.toLocaleString()} records...`);
         
         // Process all data
@@ -3232,17 +3206,18 @@ function processFallbackMode(streamedData) {
                 row.lon !== undefined && row.lat !== undefined && row.Pressure !== undefined && 
                 row.Temperature !== undefined) {
                 
-                // GPS data
+                // GPS data - use altitude directly from CSV (can be negative)
                 const pressure = parseFloat(row.Pressure);
                 const temperature = parseFloat(row.Temperature);
-                const altitude = pressureToAltitude(pressure, maxPressure);
+                const altitude = row.altitude !== undefined ? parseFloat(row.altitude) : 0;
+                const altitudeVal = isNaN(altitude) ? 0 : altitude;
                 
                 processedData.gpsData.push({
                     lon: parseFloat(row.lon),
                     lat: parseFloat(row.lat),
                     pressure: pressure,
                     temperature: temperature,
-                    altitude: altitude
+                    altitude: altitudeVal
                 });
                 
                 // Magnetometer
@@ -3258,7 +3233,7 @@ function processFallbackMode(streamedData) {
                 // Environmental
                 processedData.pressure.push(pressure);
                 processedData.temperature.push(temperature);
-                processedData.altitude.push(altitude);
+                processedData.altitude.push(altitudeVal);
                 
                 // Time
                 if (row.datetime) {
