@@ -54,9 +54,10 @@ function processDataChunk(chunk) {
             processed.temperature.push(temperature);
             processed.altitude.push(altitudeVal);
             
-            // Time
-            if (row.datetime) {
-                processed.timeLabels.push(new Date(row.datetime).getTime());
+            // Time - check for both DateTime (capital) and datetime (lowercase) for compatibility
+            const datetimeValue = row.DateTime || row.datetime;
+            if (datetimeValue) {
+                processed.timeLabels.push(new Date(datetimeValue).getTime());
             }
         }
     }

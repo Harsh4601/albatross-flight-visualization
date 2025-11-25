@@ -1325,13 +1325,15 @@ function extractAllParameterData(data) {
     // Process all records (skip header)
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        if (row.datetime && 
+        // Check for both DateTime (capital) and datetime (lowercase) for compatibility
+        const datetimeValue = row.DateTime || row.datetime;
+        if (datetimeValue && 
             row.Mx !== undefined && row.My !== undefined && row.Mz !== undefined &&
             row.Ax !== undefined && row.Ay !== undefined && row.Az !== undefined &&
             row.Pressure !== undefined && row.Temperature !== undefined) {
             
             // Parse datetime string to Date object
-            const datetime = new Date(row.datetime);
+            const datetime = new Date(datetimeValue);
             timeLabels.push(datetime);
             
             // Magnetometer data
@@ -1802,9 +1804,11 @@ function createMagnetometerChart(data) {
     // Process all records (skip header)
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        if (row.datetime && row.Mx !== undefined && row.My !== undefined && row.Mz !== undefined) {
+        // Check for both DateTime (capital) and datetime (lowercase) for compatibility
+        const datetimeValue = row.DateTime || row.datetime;
+        if (datetimeValue && row.Mx !== undefined && row.My !== undefined && row.Mz !== undefined) {
             // Parse datetime string to Date object
-            const datetime = new Date(row.datetime);
+            const datetime = new Date(datetimeValue);
             timeLabels.push(datetime);
             mxData.push(parseFloat(row.Mx));
             myData.push(parseFloat(row.My));
@@ -1995,9 +1999,11 @@ function createAccelerometerChart(data) {
     // Process all records (skip header)
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        if (row.datetime && row.Ax !== undefined && row.Ay !== undefined && row.Az !== undefined) {
+        // Check for both DateTime (capital) and datetime (lowercase) for compatibility
+        const datetimeValue = row.DateTime || row.datetime;
+        if (datetimeValue && row.Ax !== undefined && row.Ay !== undefined && row.Az !== undefined) {
             // Parse datetime string to Date object
-            const datetime = new Date(row.datetime);
+            const datetime = new Date(datetimeValue);
             timeLabels.push(datetime);
             axData.push(parseFloat(row.Ax));
             ayData.push(parseFloat(row.Ay));
@@ -3493,9 +3499,10 @@ function processFallbackMode(streamedData) {
                 processedData.temperature.push(temperature);
                 processedData.altitude.push(altitudeVal);
                 
-                // Time
-                if (row.datetime) {
-                    processedData.timeLabels.push(new Date(row.datetime));
+                // Time - check for both DateTime (capital) and datetime (lowercase) for compatibility
+                const datetimeValue = row.DateTime || row.datetime;
+                if (datetimeValue) {
+                    processedData.timeLabels.push(new Date(datetimeValue));
                 }
             }
             
@@ -4786,9 +4793,12 @@ function setupTooltipRaycasting() {
                 // Get temperature data if available
                 if (data.Temperature !== undefined) sumTemperature += data.Temperature;
                 
-                // Capture the first datetime for this segment
-                if (firstDateTime === null && data.datetime !== undefined) {
-                    firstDateTime = data.datetime;
+                // Capture the first datetime for this segment - check for both DateTime (capital) and datetime (lowercase)
+                if (firstDateTime === null) {
+                    const datetimeValue = data.DateTime || data.datetime;
+                    if (datetimeValue !== undefined) {
+                        firstDateTime = datetimeValue;
+                    }
                 }
                 
                 count++;
